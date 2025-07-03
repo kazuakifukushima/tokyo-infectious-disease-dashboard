@@ -1,0 +1,20 @@
+# GitHub リポジトリ連携手順
+
+## 1. GitHubでリポジトリ作成後、以下のコマンドを実行:
+
+# リモートリポジトリを追加 (ユーザー名を自分のものに変更)
+git remote add origin https://github.com/YOUR_USERNAME/tokyo-infectious-disease-dashboard.git
+
+# メインブランチにプッシュ
+git branch -M main
+git push -u origin main
+
+## 2. コマンド例 (実際のユーザー名に置き換えて実行):
+# git remote add origin https://github.com/fukushimakazuaki/tokyo-infectious-disease-dashboard.git
+# git branch -M main  
+# git push -u origin main
+
+## 3. 今後の更新時:
+# git add .
+# git commit -m "Update: 機能追加・修正内容"
+# git push
