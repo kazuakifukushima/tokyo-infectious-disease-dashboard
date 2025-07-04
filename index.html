@@ -301,10 +301,17 @@
                 <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">感染症データ分析</div>
             </div>
             <nav>
+                <div style="padding: 0.5rem 1.5rem; font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">全数把握疾患</div>
                 <div class="nav-item active" data-view="overview">📊 概況</div>
                 <div class="nav-item" data-view="diseases">🦠 疾病別分析</div>
                 <div class="nav-item" data-view="categories">📋 分類別統計</div>
                 <div class="nav-item" data-view="trends">📈 時系列分析</div>
+                
+                <div style="padding: 0.5rem 1.5rem; font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1rem; border-top: 1px solid #e5e7eb;">定点サーベイランス</div>
+                <div class="nav-item" data-view="sentinel-overview">🏥 定点概況</div>
+                <div class="nav-item" data-view="sentinel-influenza">🤧 インフルエンザ</div>
+                <div class="nav-item" data-view="sentinel-diseases">🦠 定点疾病分析</div>
+                <div class="nav-item" data-view="sentinel-geographic">🗺️ 地域別分析</div>
             </nav>
         </div>
         
@@ -1471,9 +1478,168 @@
                 case 'trends':
                     content.innerHTML = '<div class="loading">時系列分析機能は準備中です...</div>';
                     break;
+                case 'sentinel-overview':
+                    await renderSentinelOverview();
+                    break;
+                case 'sentinel-influenza':
+                    await renderSentinelInfluenza();
+                    break;
+                case 'sentinel-diseases':
+                    await renderSentinelDiseases();
+                    break;
+                case 'sentinel-geographic':
+                    await renderSentinelGeographic();
+                    break;
                 default:
                     content.innerHTML = '<div class="error">不明なビューです</div>';
             }
+        }
+
+        // 定点サーベイランス概況ビュー
+        async function renderSentinelOverview() {
+            const content = document.getElementById('main-content');
+            
+            content.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card" style="background: linear-gradient(135deg, #059669, #047857);">
+                        <div class="stat-label">定点医療機関数</div>
+                        <div class="stat-value">約400</div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #dc2626, #b91c1c);">
+                        <div class="stat-label">監視対象疾患</div>
+                        <div class="stat-value">28種類</div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #7c3aed, #6d28d9);">
+                        <div class="stat-label">データ期間</div>
+                        <div class="stat-value">26年間</div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #ea580c, #c2410c);">
+                        <div class="stat-label">週次報告</div>
+                        <div class="stat-value">1,352週</div>
+                    </div>
+                </div>
+                
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-title">🤧 主要監視疾患の特徴</div>
+                        <div style="padding: 1rem;">
+                            <div style="display: grid; gap: 1rem;">
+                                <div style="padding: 1rem; background: #fef3c7; border-radius: 0.5rem; border-left: 4px solid #f59e0b;">
+                                    <div style="font-weight: 600; color: #92400e;">インフルエンザ</div>
+                                    <div style="font-size: 0.875rem; color: #78350f; margin-top: 0.25rem;">冬季に流行する季節性感染症。定点サーベイランスの主要監視対象</div>
+                                </div>
+                                <div style="padding: 1rem; background: #dbeafe; border-radius: 0.5rem; border-left: 4px solid #3b82f6;">
+                                    <div style="font-weight: 600; color: #1d4ed8;">感染性胃腸炎</div>
+                                    <div style="font-size: 0.875rem; color: #1e40af; margin-top: 0.25rem;">年間を通じて発生。特に冬季にノロウイルスによる流行</div>
+                                </div>
+                                <div style="padding: 1rem; background: #dcfce7; border-radius: 0.5rem; border-left: 4px solid #22c55e;">
+                                    <div style="font-weight: 600; color: #15803d;">RSウイルス感染症</div>
+                                    <div style="font-size: 0.875rem; color: #166534; margin-top: 0.25rem;">乳幼児の重要な呼吸器感染症。秋冬季に流行</div>
+                                </div>
+                                <div style="padding: 1rem; background: #fce7f3; border-radius: 0.5rem; border-left: 4px solid #ec4899;">
+                                    <div style="font-weight: 600; color: #be185d;">手足口病</div>
+                                    <div style="font-size: 0.875rem; color: #9d174d; margin-top: 0.25rem;">夏季に流行する小児の感染症。エンテロウイルスが原因</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-card">
+                        <div class="chart-title">📊 定点サーベイランスシステム</div>
+                        <div style="padding: 1rem;">
+                            <div style="display: grid; gap: 1rem;">
+                                <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f9fafb; border-radius: 0.375rem;">
+                                    <span style="font-weight: 500;">データ形式</span>
+                                    <span>週次報告</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f9fafb; border-radius: 0.375rem;">
+                                    <span style="font-weight: 500;">報告分類</span>
+                                    <span>性別・年齢別・地域別</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f9fafb; border-radius: 0.375rem;">
+                                    <span style="font-weight: 500;">対象期間</span>
+                                    <span>2000年〜2025年</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f9fafb; border-radius: 0.375rem;">
+                                    <span style="font-weight: 500;">地理的範囲</span>
+                                    <span>東京都全域</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <div class="chart-title">🗓️ 定点サーベイランス対象疾患一覧</div>
+                    <div style="padding: 1rem;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                            <div>
+                                <h4 style="margin-bottom: 0.75rem; color: #374151; font-weight: 600;">呼吸器感染症</h4>
+                                <div style="font-size: 0.875rem; line-height: 1.5; color: #6b7280;">
+                                    インフルエンザ、RSウイルス感染症、咽頭結膜熱、マイコプラズマ肺炎、クラミジア肺炎、百日咳
+                                </div>
+                            </div>
+                            <div>
+                                <h4 style="margin-bottom: 0.75rem; color: #374151; font-weight: 600;">消化器感染症</h4>
+                                <div style="font-size: 0.875rem; line-height: 1.5; color: #6b7280;">
+                                    感染性胃腸炎、感染性胃腸炎（ロタウイルス）
+                                </div>
+                            </div>
+                            <div>
+                                <h4 style="margin-bottom: 0.75rem; color: #374151; font-weight: 600;">小児感染症</h4>
+                                <div style="font-size: 0.875rem; line-height: 1.5; color: #6b7280;">
+                                    手足口病、水痘、ヘルパンギーナ、突発性発しん、川崎病、流行性耳下腺炎
+                                </div>
+                            </div>
+                            <div>
+                                <h4 style="margin-bottom: 0.75rem; color: #374151; font-weight: 600;">その他</h4>
+                                <div style="font-size: 0.875rem; line-height: 1.5; color: #6b7280;">
+                                    麻しん、風しん、伝染性紅斑、急性出血性結膜炎、流行性角結膜炎、細菌性髄膜炎 他
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 定点サーベイランス インフルエンザビュー
+        async function renderSentinelInfluenza() {
+            const content = document.getElementById('main-content');
+            
+            content.innerHTML = `
+                <div class="loading">インフルエンザサーベイランス機能を実装中...</div>
+                <div style="padding: 2rem; text-align: center; color: #6b7280;">
+                    <div style="font-size: 1.125rem; margin-bottom: 1rem;">🤧 季節性インフルエンザ分析</div>
+                    <div>定点医療機関からの週次報告データに基づく詳細分析機能を準備中です</div>
+                </div>
+            `;
+        }
+
+        // 定点サーベイランス 疾病分析ビュー
+        async function renderSentinelDiseases() {
+            const content = document.getElementById('main-content');
+            
+            content.innerHTML = `
+                <div class="loading">定点疾病分析機能を実装中...</div>
+                <div style="padding: 2rem; text-align: center; color: #6b7280;">
+                    <div style="font-size: 1.125rem; margin-bottom: 1rem;">🦠 定点対象疾病分析</div>
+                    <div>28種類の定点監視疾患の詳細分析機能を準備中です</div>
+                </div>
+            `;
+        }
+
+        // 定点サーベイランス 地域別分析ビュー
+        async function renderSentinelGeographic() {
+            const content = document.getElementById('main-content');
+            
+            content.innerHTML = `
+                <div class="loading">地域別分析機能を実装中...</div>
+                <div style="padding: 2rem; text-align: center; color: #6b7280;">
+                    <div style="font-size: 1.125rem; margin-bottom: 1rem;">🗺️ 地域別疫学分析</div>
+                    <div>保健所別・医療圏別データの地理的分析機能を準備中です</div>
+                </div>
+            `;
         }
 
         // 初期化
