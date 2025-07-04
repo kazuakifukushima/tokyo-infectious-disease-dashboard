@@ -309,7 +309,6 @@
                 
                 <div style="padding: 0.5rem 1.5rem; font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1rem; border-top: 1px solid #e5e7eb;">定点サーベイランス</div>
                 <div class="nav-item" data-view="sentinel-overview">🏥 定点概況</div>
-                <div class="nav-item" data-view="sentinel-influenza">🤧 インフルエンザ</div>
                 <div class="nav-item" data-view="sentinel-diseases">🦠 定点疾病分析</div>
                 <div class="nav-item" data-view="sentinel-geographic">🗺️ 地域別分析</div>
             </nav>
@@ -335,11 +334,16 @@
         let isSeasonalMode = false;
         let seasonalData = null;
         let mainDataset = null; // 全データを保持
+        let sentinelDataset = null; // 定点サーベイランスデータ
+        let sentinelSummaryData = null;
+        let sentinelDiseaseList = [];
 
         // 静的データ読み込みクライアント
         async function fetchStaticData(filename) {
             try {
-                const response = await fetch(`./data/${filename}`);
+                // キャッシュを無効化するためのタイムスタンプを追加
+                const cacheBuster = new Date().getTime();
+                const response = await fetch(`./data/${filename}?v=${cacheBuster}`);
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
@@ -366,7 +370,9 @@
                 headers.forEach((header, index) => {
                     const value = values[index]?.trim() || '';
                     // 数値フィールドの変換
-                    if (header === 'count' || header === 'year' || header === 'week') {
+                    if (header === 'count' || header === 'year' || header === 'week' || 
+                        header === 'male_count' || header === 'female_count' || 
+                        header === 'total_count' || header === 'sentinel_points') {
                         row[header] = parseInt(value) || 0;
                     } else {
                         row[header] = value;
@@ -396,6 +402,28 @@
                 
             } catch (error) {
                 console.error('データ初期化エラー:', error);
+                throw error;
+            }
+        }
+
+        // Sentinelデータの初期化
+        async function initializeSentinelData() {
+            try {
+                // Sentinelデータファイルを並行で読み込み
+                const [sentinelSummaryText, sentinelDiseaseListData, sentinelCsvText] = await Promise.all([
+                    fetchStaticData('sentinel_summary_statistics.json'),
+                    fetchStaticData('sentinel_disease_list.json'),
+                    fetchStaticData('sentinel_diseases_data.csv')
+                ]);
+                
+                sentinelSummaryData = sentinelSummaryText;
+                sentinelDiseaseList = sentinelDiseaseListData;
+                sentinelDataset = parseCSV(sentinelCsvText);
+                
+                console.log(`Sentinelデータ初期化完了: ${sentinelDataset.length} レコード, ${sentinelDiseaseList.length} 疾病`);
+                
+            } catch (error) {
+                console.error('Sentinelデータ初期化エラー:', error);
                 throw error;
             }
         }
@@ -533,16 +561,6 @@
             
             return { yearly_trends: trends };
         }
-
-        // ナビゲーション処理
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', function() {
-                document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
-                this.classList.add('active');
-                currentView = this.dataset.view;
-                renderView(currentView);
-            });
-        });
 
         // 概況ビューのレンダリング
         async function renderOverview() {
@@ -1481,9 +1499,6 @@
                 case 'sentinel-overview':
                     await renderSentinelOverview();
                     break;
-                case 'sentinel-influenza':
-                    await renderSentinelInfluenza();
-                    break;
                 case 'sentinel-diseases':
                     await renderSentinelDiseases();
                     break;
@@ -1603,30 +1618,294 @@
             `;
         }
 
-        // 定点サーベイランス インフルエンザビュー
-        async function renderSentinelInfluenza() {
-            const content = document.getElementById('main-content');
-            
-            content.innerHTML = `
-                <div class="loading">インフルエンザサーベイランス機能を実装中...</div>
-                <div style="padding: 2rem; text-align: center; color: #6b7280;">
-                    <div style="font-size: 1.125rem; margin-bottom: 1rem;">🤧 季節性インフルエンザ分析</div>
-                    <div>定点医療機関からの週次報告データに基づく詳細分析機能を準備中です</div>
-                </div>
-            `;
-        }
-
         // 定点サーベイランス 疾病分析ビュー
         async function renderSentinelDiseases() {
             const content = document.getElementById('main-content');
             
-            content.innerHTML = `
-                <div class="loading">定点疾病分析機能を実装中...</div>
-                <div style="padding: 2rem; text-align: center; color: #6b7280;">
-                    <div style="font-size: 1.125rem; margin-bottom: 1rem;">🦠 定点対象疾病分析</div>
-                    <div>28種類の定点監視疾患の詳細分析機能を準備中です</div>
-                </div>
-            `;
+            try {
+                // Sentinelデータの初期化（毎回最新データを読み込み）
+                content.innerHTML = '<div class="loading">定点サーベイランスデータを読み込み中...</div>';
+                await initializeSentinelData();
+
+                content.innerHTML = `
+                    <div class="filter-section">
+                        <h3 class="chart-title">定点疾病分析設定</h3>
+                        <div class="filter-grid">
+                            <div class="form-group">
+                                <label class="form-label">定点監視疾患</label>
+                                <select id="sentinelDiseaseSelect" class="form-select">
+                                    <option value="">疾患を選択してください</option>
+                                    ${sentinelDiseaseList.map(disease => {
+                                        const stats = sentinelSummaryData?.disease_statistics?.[disease];
+                                        const totalCases = stats?.total_cases || 0;
+                                        return `<option value="${disease}">${disease} (${totalCases.toLocaleString()}症例)</option>`;
+                                    }).join('')}
+                                </select>
+                                <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
+                                    ※括弧内は全期間の累計症例数
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">開始年</label>
+                                <select id="sentinelStartYear" class="form-select">
+                                    ${Array.from({length: 26}, (_, i) => 2000 + i).map(year => `
+                                        <option value="${year}" ${year === 2020 ? 'selected' : ''}>${year}年</option>
+                                    `).join('')}
+                                </select>
+                                <div style="font-size: 0.75rem; color: transparent; margin-top: 0.25rem;">
+                                    　
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">終了年</label>
+                                <select id="sentinelEndYear" class="form-select">
+                                    ${Array.from({length: 26}, (_, i) => 2000 + i).map(year => `
+                                        <option value="${year}" ${year === 2024 ? 'selected' : ''}>${year}年</option>
+                                    `).join('')}
+                                </select>
+                                <div style="font-size: 0.75rem; color: transparent; margin-top: 0.25rem;">
+                                    　
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <button id="sentinelAnalyzeBtn" class="btn btn-primary" disabled>分析実行</button>
+                                <div style="font-size: 0.75rem; color: transparent; margin-top: 0.25rem;">
+                                    　
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="sentinelAnalysisResults" style="display: none;">
+                        <div class="metric-cards">
+                            <div class="metric-card">
+                                <div class="metric-value" id="sentinelTotalRecords">-</div>
+                                <div class="metric-label">週次報告数</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="sentinelTotalCases">-</div>
+                                <div class="metric-label">期間内症例数</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="sentinelMaxWeekly">-</div>
+                                <div class="metric-label">最大週間症例数</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="sentinelAvgWeekly">-</div>
+                                <div class="metric-label">週平均症例数</div>
+                            </div>
+                        </div>
+                        
+                        <div class="charts-grid">
+                            <div class="chart-card" style="grid-column: 1 / -1;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                    <div class="chart-title" id="sentinelTimeseriesTitle">定点疾病時系列グラフ</div>
+                                    <div style="display: flex; gap: 1rem; align-items: center;">
+                                        <div class="form-group" style="margin: 0;">
+                                            <button id="sentinelSeasonalToggleBtn" class="btn btn-primary" style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
+                                                季節性比較
+                                            </button>
+                                        </div>
+                                        <div class="form-group" style="margin: 0;">
+                                            <select id="sentinelTimeUnitSelect" class="form-select" style="min-width: 120px;">
+                                                <option value="week">週単位</option>
+                                                <option value="month">月単位</option>
+                                                <option value="year">年単位</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="chart-container" style="height: 400px;">
+                                    <canvas id="sentinelTimeseriesChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <div class="chart-title">データ詳細 (最新20件)</div>
+                            <div style="max-height: 400px; overflow-y: auto;">
+                                <table class="data-table" id="sentinelDataTable">
+                                    <thead>
+                                        <tr>
+                                            <th>週</th>
+                                            <th>男性症例</th>
+                                            <th>女性症例</th>
+                                            <th>合計症例</th>
+                                            <th>定点数</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sentinelDataTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // イベントリスナーを追加
+                setupSentinelDiseaseAnalysisEvents();
+
+            } catch (error) {
+                content.innerHTML = `<div class="error">定点疾病分析の読み込みに失敗しました: ${error.message}</div>`;
+            }
+        }
+
+        // 定点疾病分析のイベントハンドラー
+        function setupSentinelDiseaseAnalysisEvents() {
+            const diseaseSelect = document.getElementById('sentinelDiseaseSelect');
+            const analyzeBtn = document.getElementById('sentinelAnalyzeBtn');
+
+            diseaseSelect.addEventListener('change', function() {
+                analyzeBtn.disabled = !this.value;
+            });
+
+            analyzeBtn.addEventListener('click', async function() {
+                const disease = diseaseSelect.value;
+                const startYear = document.getElementById('sentinelStartYear').value;
+                const endYear = document.getElementById('sentinelEndYear').value;
+
+                if (!disease) return;
+
+                this.disabled = true;
+                this.textContent = '分析中...';
+
+                try {
+                    await analyzeSentinelDiseaseData(disease, startYear, endYear);
+                } catch (error) {
+                    alert('分析中にエラーが発生しました: ' + error.message);
+                } finally {
+                    this.disabled = false;
+                    this.textContent = '分析実行';
+                }
+            });
+        }
+
+        // 定点疾病データの分析実行
+        async function analyzeSentinelDiseaseData(disease, startYear, endYear) {
+            try {
+                // データをフィルタリング
+                let filteredData = sentinelDataset.filter(record => 
+                    record.disease_name === disease &&
+                    record.year >= parseInt(startYear) &&
+                    record.year <= parseInt(endYear)
+                );
+
+                if (filteredData.length === 0) {
+                    throw new Error('指定された条件のデータが見つかりません');
+                }
+
+                // 統計情報を計算
+                const totalCases = filteredData.reduce((sum, item) => sum + item.total_count, 0);
+                const maxWeekly = Math.max(...filteredData.map(item => item.total_count));
+                const avgWeekly = totalCases / filteredData.length;
+
+                // メトリクスカードを更新
+                document.getElementById('sentinelTotalRecords').textContent = filteredData.length.toLocaleString();
+                document.getElementById('sentinelTotalCases').textContent = totalCases.toLocaleString();
+                document.getElementById('sentinelMaxWeekly').textContent = maxWeekly.toLocaleString();
+                document.getElementById('sentinelAvgWeekly').textContent = avgWeekly.toFixed(1);
+
+                // チャートを描画
+                renderSentinelTimeseries(filteredData, disease);
+
+                // データテーブルを更新
+                updateSentinelDataTable(filteredData);
+
+                // 結果セクションを表示
+                document.getElementById('sentinelAnalysisResults').style.display = 'block';
+
+            } catch (error) {
+                throw new Error(`データの分析に失敗しました: ${error.message}`);
+            }
+        }
+
+        // 定点疾病時系列チャートの描画
+        function renderSentinelTimeseries(data, diseaseName) {
+            const ctx = document.getElementById('sentinelTimeseriesChart');
+            
+            // 既存のチャートを破棄
+            if (window.sentinelChart) {
+                window.sentinelChart.destroy();
+            }
+
+            // タイトルを更新
+            document.getElementById('sentinelTimeseriesTitle').textContent = `${diseaseName} の発生動向（定点サーベイランス）`;
+
+            // データを時系列順にソート
+            data.sort((a, b) => {
+                if (a.year !== b.year) return a.year - b.year;
+                return a.week - b.week;
+            });
+
+            // ラベルとデータを準備
+            const labels = data.map(item => `${item.year}年第${item.week}週`);
+            const values = data.map(item => item.total_count);
+
+            window.sentinelChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: diseaseName,
+                        data: values,
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        tension: 0.1,
+                        fill: true,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '週間症例数'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '報告週'
+                            },
+                            ticks: {
+                                maxTicksLimit: 20
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 定点データテーブルの更新
+        function updateSentinelDataTable(data) {
+            const tbody = document.getElementById('sentinelDataTableBody');
+            const recentData = data.slice(-20).reverse(); // 最新20件を逆順で表示
+
+            tbody.innerHTML = recentData.map(item => {
+                return `
+                    <tr>
+                        <td>${item.year}年第${item.week}週</td>
+                        <td style="font-family: monospace; text-align: right;">${item.male_count}</td>
+                        <td style="font-family: monospace; text-align: right;">${item.female_count}</td>
+                        <td style="font-family: monospace; text-align: right; font-weight: 600;">${item.total_count}</td>
+                        <td style="font-family: monospace; text-align: right;">${item.sentinel_points}</td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         // 定点サーベイランス 地域別分析ビュー
@@ -1644,6 +1923,21 @@
 
         // 初期化
         document.addEventListener('DOMContentLoaded', function() {
+            // Sentinelデータをクリア（最新データを確実に読み込むため）
+            sentinelDataset = null;
+            sentinelSummaryData = null;
+            sentinelDiseaseList = [];
+            
+            // ナビゲーション処理
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                    this.classList.add('active');
+                    currentView = this.dataset.view;
+                    renderView(currentView);
+                });
+            });
+            
             renderView('overview');
         });
     </script>
