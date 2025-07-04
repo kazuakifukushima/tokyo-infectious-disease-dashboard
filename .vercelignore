@@ -1,0 +1,11 @@
+# Ignore Next.js related files to force static deployment
+src/
+.next/
+next.config.js
+package.json
+package-lock.json
+node_modules/
+backend/
+csv_list/
+github_setup.txt
+README.md
