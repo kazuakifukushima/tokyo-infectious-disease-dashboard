@@ -85,6 +85,31 @@ npm run dev
 - バックエンドAPI: http://localhost:8000
 - API Documentation: http://localhost:8000/docs
 
+## 🚀 Vercelデプロイ版
+
+**本ダッシュボードはVercelで静的サイトとしてデプロイ可能です。**
+
+### デプロイ済みサイト
+- **URL**: [将来のVercelデプロイURL]
+- **特徴**: 完全静的版、サーバー不要、高速ロード
+
+### ローカルでの静的版テスト
+```bash
+# 静的ファイルサーバーで確認
+npx serve .
+# または
+python -m http.server 8080
+```
+
+### Vercelでのデプロイ手順
+1. GitHubリポジトリをVercelにインポート
+2. Framework Preset: "Other" を選択
+3. Build Command: 空白のまま
+4. Output Directory: "./" を指定
+5. デプロイ実行
+
+**注意**: 静的版は全データをクライアントサイドで処理するため、初回ロード時にデータファイル（約10MB）をダウンロードします。
+
 ## 📚 使用方法
 
 ### 概況ダッシュボード
