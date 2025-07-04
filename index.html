@@ -337,6 +337,9 @@
         let sentinelDataset = null; // 定点サーベイランスデータ
         let sentinelSummaryData = null;
         let sentinelDiseaseList = [];
+        let sentinelCurrentData = null; // 現在分析中のデータ
+        let sentinelIsSeasonalMode = false; // 季節性比較モード
+        let sentinelSeasonalData = null; // 季節性比較データ
 
         // 静的データ読み込みクライアント
         async function fetchStaticData(filename) {
@@ -1754,6 +1757,8 @@
         function setupSentinelDiseaseAnalysisEvents() {
             const diseaseSelect = document.getElementById('sentinelDiseaseSelect');
             const analyzeBtn = document.getElementById('sentinelAnalyzeBtn');
+            const seasonalToggleBtn = document.getElementById('sentinelSeasonalToggleBtn');
+            const timeUnitSelect = document.getElementById('sentinelTimeUnitSelect');
 
             diseaseSelect.addEventListener('change', function() {
                 analyzeBtn.disabled = !this.value;
@@ -1778,6 +1783,54 @@
                     this.textContent = '分析実行';
                 }
             });
+
+            // 季節性比較ボタンのイベントリスナー
+            seasonalToggleBtn.addEventListener('click', function() {
+                if (!sentinelCurrentData) {
+                    alert('まず疾病を選択して分析を実行してください');
+                    return;
+                }
+
+                const disease = document.getElementById('sentinelDiseaseSelect').value;
+                const startYear = document.getElementById('sentinelStartYear').value;
+                const endYear = document.getElementById('sentinelEndYear').value;
+
+                if (sentinelIsSeasonalMode) {
+                    // 季節性比較モードから通常表示に戻る
+                    sentinelIsSeasonalMode = false;
+                    sentinelSeasonalData = null;
+                    updateSentinelSeasonalToggleButton();
+                    renderSentinelTimeseries(sentinelCurrentData, disease);
+                } else {
+                    // 通常表示から季節性比較モードに切り替え
+                    if (parseInt(startYear) === parseInt(endYear)) {
+                        // 同一年の場合は季節性比較を実行
+                        analyzeSentinelSeasonalPattern(disease, startYear);
+                    } else {
+                        alert('季節性比較は開始年と終了年を同じ年に設定してください');
+                    }
+                }
+            });
+
+            // 横軸単位変更のイベントリスナー
+            timeUnitSelect.addEventListener('change', function() {
+                if (!sentinelCurrentData) return;
+
+                const disease = document.getElementById('sentinelDiseaseSelect').value;
+                
+                if (sentinelIsSeasonalMode && sentinelSeasonalData) {
+                    // 季節性比較モードの場合
+                    renderSentinelSeasonalComparisonChart(
+                        sentinelSeasonalData.normalizedData,
+                        sentinelSeasonalData.disease,
+                        sentinelSeasonalData.years,
+                        sentinelSeasonalData.targetYear
+                    );
+                } else {
+                    // 通常モードの場合
+                    renderSentinelTimeseries(sentinelCurrentData, disease);
+                }
+            });
         }
 
         // 定点疾病データの分析実行
@@ -1794,6 +1847,11 @@
                     throw new Error('指定された条件のデータが見つかりません');
                 }
 
+                // 現在のデータを保存
+                sentinelCurrentData = filteredData;
+                sentinelIsSeasonalMode = false;
+                sentinelSeasonalData = null;
+
                 // 統計情報を計算
                 const totalCases = filteredData.reduce((sum, item) => sum + item.total_count, 0);
                 const maxWeekly = Math.max(...filteredData.map(item => item.total_count));
@@ -1804,6 +1862,9 @@
                 document.getElementById('sentinelTotalCases').textContent = totalCases.toLocaleString();
                 document.getElementById('sentinelMaxWeekly').textContent = maxWeekly.toLocaleString();
                 document.getElementById('sentinelAvgWeekly').textContent = avgWeekly.toFixed(1);
+
+                // ボタンの状態を更新
+                updateSentinelSeasonalToggleButton();
 
                 // チャートを描画
                 renderSentinelTimeseries(filteredData, disease);
@@ -1837,9 +1898,11 @@
                 return a.week - b.week;
             });
 
-            // ラベルとデータを準備
-            const labels = data.map(item => `${item.year}年第${item.week}週`);
-            const values = data.map(item => item.total_count);
+            // 横軸単位を取得
+            const timeUnit = document.getElementById('sentinelTimeUnitSelect').value;
+            
+            // 単位に応じてデータを集約
+            const { labels, values } = aggregateSentinelDataByTimeUnit(data, timeUnit);
 
             window.sentinelChart = new Chart(ctx, {
                 type: 'line',
@@ -1906,6 +1969,193 @@
                     </tr>
                 `;
             }).join('');
+        }
+
+        // 定点疾病データの時間単位集約
+        function aggregateSentinelDataByTimeUnit(data, timeUnit) {
+            if (timeUnit === 'week') {
+                // 週単位の場合はそのまま
+                const labels = data.map(item => `${item.year}年第${item.week}週`);
+                const values = data.map(item => item.total_count);
+                return { labels, values };
+            } else if (timeUnit === 'month') {
+                // 月単位で集約
+                const monthlyData = {};
+                data.forEach(item => {
+                    const weekDate = new Date(item.year, 0, (item.week - 1) * 7 + 1);
+                    const monthKey = `${item.year}-${String(weekDate.getMonth() + 1).padStart(2, '0')}`;
+                    if (!monthlyData[monthKey]) {
+                        monthlyData[monthKey] = 0;
+                    }
+                    monthlyData[monthKey] += item.total_count;
+                });
+                
+                const labels = Object.keys(monthlyData).sort().map(key => {
+                    const [year, month] = key.split('-');
+                    return `${year}年${month}月`;
+                });
+                const values = Object.keys(monthlyData).sort().map(key => monthlyData[key]);
+                return { labels, values };
+            } else if (timeUnit === 'year') {
+                // 年単位で集約
+                const yearlyData = {};
+                data.forEach(item => {
+                    const yearKey = item.year;
+                    if (!yearlyData[yearKey]) {
+                        yearlyData[yearKey] = 0;
+                    }
+                    yearlyData[yearKey] += item.total_count;
+                });
+                
+                const labels = Object.keys(yearlyData).sort().map(year => `${year}年`);
+                const values = Object.keys(yearlyData).sort().map(year => yearlyData[year]);
+                return { labels, values };
+            }
+        }
+
+        // 定点疾病季節性パターン分析
+        async function analyzeSentinelSeasonalPattern(disease, targetYear) {
+            try {
+                // 過去5年間のデータを取得
+                const years = [];
+                const currentYear = parseInt(targetYear);
+                for (let i = 4; i >= 0; i--) {
+                    years.push(currentYear - i);
+                }
+
+                // 各年のデータを取得
+                const yearlyData = {};
+                const allNormalizedData = [];
+
+                for (const year of years) {
+                    const yearData = sentinelDataset.filter(record => 
+                        record.disease_name === disease && 
+                        record.year === year
+                    );
+
+                    if (yearData.length > 0) {
+                        // 週ごとに正規化（1-52週）
+                        const weeklyData = new Array(52).fill(0);
+                        yearData.forEach(record => {
+                            if (record.week >= 1 && record.week <= 52) {
+                                weeklyData[record.week - 1] = record.total_count;
+                            }
+                        });
+
+                        yearlyData[year] = weeklyData;
+                        allNormalizedData.push({
+                            year: year,
+                            data: weeklyData
+                        });
+                    }
+                }
+
+                // 季節性データを保存
+                sentinelSeasonalData = {
+                    disease: disease,
+                    years: years,
+                    targetYear: currentYear,
+                    normalizedData: allNormalizedData
+                };
+
+                sentinelIsSeasonalMode = true;
+                updateSentinelSeasonalToggleButton();
+
+                // 季節性比較チャートを描画
+                renderSentinelSeasonalComparisonChart(allNormalizedData, disease, years, currentYear);
+
+            } catch (error) {
+                alert('季節性分析でエラーが発生しました: ' + error.message);
+            }
+        }
+
+        // 定点疾病季節性比較チャートの描画
+        function renderSentinelSeasonalComparisonChart(normalizedData, diseaseName, years, targetYear) {
+            const ctx = document.getElementById('sentinelTimeseriesChart');
+            
+            // 既存のチャートを破棄
+            if (window.sentinelChart) {
+                window.sentinelChart.destroy();
+            }
+
+            // タイトルを更新
+            document.getElementById('sentinelTimeseriesTitle').textContent = `${diseaseName} の季節性比較（定点サーベイランス）`;
+
+            // ラベルを準備（週番号）
+            const labels = Array.from({length: 52}, (_, i) => `第${i + 1}週`);
+
+            // 色のパレット
+            const colors = [
+                'rgba(59, 130, 246, 1)',   // 対象年（青）
+                'rgba(34, 197, 94, 1)',    // 1年前（緑）
+                'rgba(245, 158, 11, 1)',   // 2年前（オレンジ）
+                'rgba(239, 68, 68, 1)',    // 3年前（赤）
+                'rgba(147, 51, 234, 1)'    // 4年前（紫）
+            ];
+
+            // データセットを準備
+            const datasets = normalizedData.map((yearData, index) => {
+                const isTargetYear = yearData.year === targetYear;
+                return {
+                    label: `${yearData.year}年`,
+                    data: yearData.data,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length].replace('1)', '0.1)'),
+                    tension: 0.1,
+                    fill: false,
+                    pointRadius: isTargetYear ? 3 : 2,
+                    pointHoverRadius: isTargetYear ? 6 : 4,
+                    borderWidth: isTargetYear ? 3 : 2
+                };
+            }).reverse(); // 対象年を左端に配置
+
+            window.sentinelChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '週間症例数'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '週番号'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 定点疾病季節性比較ボタンの状態更新
+        function updateSentinelSeasonalToggleButton() {
+            const toggleBtn = document.getElementById('sentinelSeasonalToggleBtn');
+            if (sentinelIsSeasonalMode) {
+                toggleBtn.textContent = '通常表示';
+                toggleBtn.style.backgroundColor = '#dc2626';
+            } else {
+                toggleBtn.textContent = '季節性比較';
+                toggleBtn.style.backgroundColor = '#3b82f6';
+            }
         }
 
         // 定点サーベイランス 地域別分析ビュー
