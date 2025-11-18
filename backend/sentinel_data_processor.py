@@ -54,11 +54,38 @@ def parse_filename(filename):
 def read_sentinel_csv(filepath):
     """
     Shift-JISエンコードのSentinelCSVファイルを読み込み
+    集計期間情報も返す
+    
+    Returns:
+        (headers, data_rows, period_info): ヘッダー、データ行、集計期間情報
+        period_info: {'start_week': int, 'end_week': int, 'is_aggregated': bool}
     """
     try:
         with open(filepath, 'r', encoding='shift-jis') as f:
             reader = csv.reader(f)
             rows = list(reader)
+        
+        # 集計期間情報を読み取る
+        period_info = {'start_week': None, 'end_week': None, 'is_aggregated': False}
+        for i, row in enumerate(rows[:10]):
+            if len(row) >= 2:
+                if '集計期間開始週' in row[0] or '集計期間開始' in row[0]:
+                    # 例: ['集計期間開始週', '2025年45週'] から週番号を抽出
+                    week_str = row[1] if len(row) > 1 else ''
+                    import re
+                    match = re.search(r'(\d+)週', week_str)
+                    if match:
+                        period_info['start_week'] = int(match.group(1))
+                elif '集計期間終了週' in row[0] or '集計期間終了' in row[0]:
+                    week_str = row[1] if len(row) > 1 else ''
+                    import re
+                    match = re.search(r'(\d+)週', week_str)
+                    if match:
+                        period_info['end_week'] = int(match.group(1))
+        
+        # 開始週と終了週が異なる場合は合算データ
+        if period_info['start_week'] is not None and period_info['end_week'] is not None:
+            period_info['is_aggregated'] = period_info['start_week'] != period_info['end_week']
             
         # ヘッダー行を見つける
         header_row_idx = -1
@@ -68,7 +95,7 @@ def read_sentinel_csv(filepath):
                 break
         
         if header_row_idx == -1:
-            return None, None
+            return None, None, period_info
             
         # ヘッダーを取得
         headers = rows[header_row_idx]
@@ -83,11 +110,11 @@ def read_sentinel_csv(filepath):
                 if cleaned_row[0] and cleaned_row[0] != '疾病名':
                     data_rows.append(cleaned_row)
         
-        return headers, data_rows
+        return headers, data_rows, period_info
         
     except Exception as e:
         print(f"Error reading {filepath}: {e}")
-        return None, None
+        return None, None, {'start_week': None, 'end_week': None, 'is_aggregated': False}
 
 def process_gender_data(data_dir: str = '../csv_list'):
     """
@@ -119,13 +146,36 @@ def process_gender_data(data_dir: str = '../csv_list'):
         if not metadata:
             continue
             
-        headers, data_rows = read_sentinel_csv(filepath)
+        headers, data_rows, period_info = read_sentinel_csv(filepath)
         if not headers or not data_rows:
             continue
             
+        # 合算データの場合は警告を出してスキップ
+        if period_info.get('is_aggregated', False):
+            print(f"警告: {os.path.basename(filepath)} は合算データです（開始週: {period_info['start_week']}, 終了週: {period_info['end_week']}）。スキップします。")
+            continue
+        
         # データ構造を確認
         # 期待される列: ["疾病名", "男性", "女性", "男女合計", "定点数"]
         if len(headers) < 4:
+            continue
+        
+        # 異常に大きい値の検出（前週の3倍以上など）
+        # インフルエンザの値が異常に大きい場合は警告
+        influenza_value = None
+        for row in data_rows:
+            if len(row) >= 4 and 'インフルエンザ' in row[0] and '入院' not in row[0]:
+                try:
+                    influenza_value = int(row[3] or 0)
+                    # 異常に大きい値（例：10,000件以上）の場合は警告
+                    if influenza_value > 10000:
+                        print(f"警告: {os.path.basename(filepath)} のインフルエンザ値が異常に大きいです（{influenza_value:,}件）。合算データの可能性があります。スキップします。")
+                        break
+                except (ValueError, IndexError):
+                    pass
+        
+        # 異常値が検出された場合はスキップ
+        if influenza_value and influenza_value > 10000:
             continue
             
         for row in data_rows:

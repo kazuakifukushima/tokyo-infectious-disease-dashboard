@@ -1,35 +1,35 @@
 {
-  "total_records": 28943,
+  "total_records": 28101,
   "total_diseases": 29,
   "available_diseases": [
-    "細菌性髄膜炎",
-    "マイコプラズマ肺炎",
     "百日咳",
-    "成人麻しん",
-    "Ａ群溶血性レンサ球菌咽頭炎",
-    "無菌性髄膜炎",
-    "不明発しん症",
-    "突発性発しん",
-    "ヘルパンギーナ",
-    "急性呼吸器感染症（ARI）",
-    "流行性角結膜炎",
-    "感染性胃腸炎（ロタウイルス）",
-    "インフルエンザ",
-    "麻しん（成人麻しん以外）",
-    "咽頭結膜熱",
-    "水痘",
-    "RSウイルス感染症",
-    "COVID-19入院",
-    "伝染性紅斑",
-    "新型コロナウイルス感染症（COVID-19）",
-    "急性脳炎(日本脳炎を除く)",
-    "インフルエンザ入院",
-    "風しん",
-    "手足口病",
-    "川崎病",
-    "急性出血性結膜炎",
     "クラミジア肺炎(オウム病は除く)",
     "感染性胃腸炎",
+    "風しん",
+    "突発性発しん",
+    "急性脳炎(日本脳炎を除く)",
+    "インフルエンザ入院",
+    "成人麻しん",
+    "流行性角結膜炎",
+    "伝染性紅斑",
+    "マイコプラズマ肺炎",
+    "インフルエンザ",
+    "COVID-19入院",
+    "細菌性髄膜炎",
+    "咽頭結膜熱",
+    "RSウイルス感染症",
+    "ヘルパンギーナ",
+    "不明発しん症",
+    "急性呼吸器感染症（ARI）",
+    "感染性胃腸炎（ロタウイルス）",
+    "水痘",
+    "川崎病",
+    "新型コロナウイルス感染症（COVID-19）",
+    "麻しん（成人麻しん以外）",
+    "無菌性髄膜炎",
+    "急性出血性結膜炎",
+    "Ａ群溶血性レンサ球菌咽頭炎",
+    "手足口病",
     "流行性耳下腺炎"
   ],
   "date_range": {
@@ -38,8 +38,8 @@
   },
   "disease_statistics": {
     "インフルエンザ": {
-      "total_reports": 1317,
-      "total_cases": 1820492,
+      "total_reports": 1278,
+      "total_cases": 1222710,
       "years_active": [
         2000,
         2001,
@@ -70,12 +70,12 @@
       ],
       "peak_year": 2023,
       "peak_count": 166792,
-      "avg_weekly_cases": 1382.3022019741838,
+      "avg_weekly_cases": 956.7370892018779,
       "years_span": 26
     },
     "RSウイルス感染症": {
-      "total_reports": 1317,
-      "total_cases": 110469,
+      "total_reports": 1278,
+      "total_cases": 107633,
       "years_active": [
         2000,
         2001,
@@ -106,12 +106,12 @@
       ],
       "peak_year": 2021,
       "peak_count": 16189,
-      "avg_weekly_cases": 83.87927107061503,
+      "avg_weekly_cases": 84.21987480438185,
       "years_span": 26
     },
     "咽頭結膜熱": {
-      "total_reports": 1317,
-      "total_cases": 94462,
+      "total_reports": 1278,
+      "total_cases": 92184,
       "years_active": [
         2000,
         2001,
@@ -142,12 +142,12 @@
       ],
       "peak_year": 2023,
       "peak_count": 14418,
-      "avg_weekly_cases": 71.72513287775247,
+      "avg_weekly_cases": 72.13145539906104,
       "years_span": 26
     },
     "Ａ群溶血性レンサ球菌咽頭炎": {
-      "total_reports": 1317,
-      "total_cases": 445238,
+      "total_reports": 1278,
+      "total_cases": 421833,
       "years_active": [
         2000,
         2001,
@@ -176,14 +176,14 @@
         2024,
         2025
       ],
-      "peak_year": 2024,
-      "peak_count": 35588,
-      "avg_weekly_cases": 338.0698557327259,
+      "peak_year": 2015,
+      "peak_count": 35039,
+      "avg_weekly_cases": 330.07276995305165,
       "years_span": 26
     },
     "感染性胃腸炎": {
-      "total_reports": 1317,
-      "total_cases": 1646411,
+      "total_reports": 1278,
+      "total_cases": 1568171,
       "years_active": [
         2000,
         2001,
@@ -213,13 +213,13 @@
         2025
       ],
       "peak_year": 2012,
-      "peak_count": 118967,
-      "avg_weekly_cases": 1250.1222475322704,
+      "peak_count": 106550,
+      "avg_weekly_cases": 1227.050860719875,
       "years_span": 26
     },
     "水痘": {
-      "total_reports": 1317,
-      "total_cases": 173159,
+      "total_reports": 1278,
+      "total_cases": 166469,
       "years_active": [
         2000,
         2001,
@@ -249,13 +249,13 @@
         2025
       ],
       "peak_year": 2011,
-      "peak_count": 15679,
-      "avg_weekly_cases": 131.4798785117692,
+      "peak_count": 14693,
+      "avg_weekly_cases": 130.25743348982786,
       "years_span": 26
     },
     "手足口病": {
-      "total_reports": 1317,
-      "total_cases": 315097,
+      "total_reports": 1278,
+      "total_cases": 314145,
       "years_active": [
         2000,
         2001,
@@ -285,13 +285,13 @@
         2025
       ],
       "peak_year": 2024,
-      "peak_count": 59022,
-      "avg_weekly_cases": 239.2536066818527,
+      "peak_count": 58737,
+      "avg_weekly_cases": 245.80985915492957,
       "years_span": 26
     },
     "伝染性紅斑": {
-      "total_reports": 1317,
-      "total_cases": 86144,
+      "total_reports": 1278,
+      "total_cases": 80695,
       "years_active": [
         2000,
         2001,
@@ -321,13 +321,13 @@
         2025
       ],
       "peak_year": 2018,
-      "peak_count": 10733,
-      "avg_weekly_cases": 65.4092634776006,
+      "peak_count": 10602,
+      "avg_weekly_cases": 63.141627543035995,
       "years_span": 26
     },
     "突発性発しん": {
-      "total_reports": 1317,
-      "total_cases": 136140,
+      "total_reports": 1278,
+      "total_cases": 131993,
       "years_active": [
         2000,
         2001,
@@ -356,14 +356,14 @@
         2024,
         2025
       ],
-      "peak_year": 2012,
-      "peak_count": 8547,
-      "avg_weekly_cases": 103.37129840546697,
+      "peak_year": 2013,
+      "peak_count": 8039,
+      "avg_weekly_cases": 103.2809076682316,
       "years_span": 26
     },
     "百日咳": {
-      "total_reports": 926,
-      "total_cases": 2975,
+      "total_reports": 899,
+      "total_cases": 2857,
       "years_active": [
         2000,
         2001,
@@ -386,7 +386,7 @@
       ],
       "peak_year": 2010,
       "peak_count": 506,
-      "avg_weekly_cases": 3.212742980561555,
+      "avg_weekly_cases": 3.1779755283648496,
       "years_span": 18
     },
     "風しん": {
@@ -408,8 +408,8 @@
       "years_span": 8
     },
     "ヘルパンギーナ": {
-      "total_reports": 1317,
-      "total_cases": 194285,
+      "total_reports": 1278,
+      "total_cases": 194132,
       "years_active": [
         2000,
         2001,
@@ -440,7 +440,7 @@
       ],
       "peak_year": 2023,
       "peak_count": 16077,
-      "avg_weekly_cases": 147.5208807896735,
+      "avg_weekly_cases": 151.90297339593116,
       "years_span": 26
     },
     "麻しん（成人麻しん以外）": {
@@ -462,8 +462,8 @@
       "years_span": 8
     },
     "流行性耳下腺炎": {
-      "total_reports": 1317,
-      "total_cases": 81540,
+      "total_reports": 1278,
+      "total_cases": 79508,
       "years_active": [
         2000,
         2001,
@@ -493,13 +493,13 @@
         2025
       ],
       "peak_year": 2016,
-      "peak_count": 8526,
-      "avg_weekly_cases": 61.913439635535305,
+      "peak_count": 7842,
+      "avg_weekly_cases": 62.21283255086072,
       "years_span": 26
     },
     "不明発しん症": {
-      "total_reports": 1317,
-      "total_cases": 20193,
+      "total_reports": 1278,
+      "total_cases": 19666,
       "years_active": [
         2000,
         2001,
@@ -529,13 +529,13 @@
         2025
       ],
       "peak_year": 2011,
-      "peak_count": 1506,
-      "avg_weekly_cases": 15.33257403189066,
+      "peak_count": 1451,
+      "avg_weekly_cases": 15.38810641627543,
       "years_span": 26
     },
     "川崎病": {
-      "total_reports": 1317,
-      "total_cases": 3506,
+      "total_reports": 1278,
+      "total_cases": 3367,
       "years_active": [
         2000,
         2001,
@@ -565,13 +565,13 @@
         2025
       ],
       "peak_year": 2013,
-      "peak_count": 222,
-      "avg_weekly_cases": 2.6621108580106303,
+      "peak_count": 210,
+      "avg_weekly_cases": 2.634585289514867,
       "years_span": 26
     },
     "急性出血性結膜炎": {
-      "total_reports": 1317,
-      "total_cases": 553,
+      "total_reports": 1278,
+      "total_cases": 549,
       "years_active": [
         2000,
         2001,
@@ -602,12 +602,12 @@
       ],
       "peak_year": 2007,
       "peak_count": 82,
-      "avg_weekly_cases": 0.4198936977980258,
+      "avg_weekly_cases": 0.4295774647887324,
       "years_span": 26
     },
     "流行性角結膜炎": {
-      "total_reports": 1317,
-      "total_cases": 21664,
+      "total_reports": 1278,
+      "total_cases": 20990,
       "years_active": [
         2000,
         2001,
@@ -638,7 +638,7 @@
       ],
       "peak_year": 2015,
       "peak_count": 1256,
-      "avg_weekly_cases": 16.449506454062263,
+      "avg_weekly_cases": 16.42410015649452,
       "years_span": 26
     },
     "急性脳炎(日本脳炎を除く)": {
@@ -657,8 +657,8 @@
       "years_span": 5
     },
     "細菌性髄膜炎": {
-      "total_reports": 1317,
-      "total_cases": 713,
+      "total_reports": 1278,
+      "total_cases": 685,
       "years_active": [
         2000,
         2001,
@@ -688,13 +688,13 @@
         2025
       ],
       "peak_year": 2011,
-      "peak_count": 52,
-      "avg_weekly_cases": 0.5413819286256644,
+      "peak_count": 50,
+      "avg_weekly_cases": 0.5359937402190923,
       "years_span": 26
     },
     "無菌性髄膜炎": {
-      "total_reports": 1317,
-      "total_cases": 1315,
+      "total_reports": 1278,
+      "total_cases": 1278,
       "years_active": [
         2000,
         2001,
@@ -724,13 +724,13 @@
         2025
       ],
       "peak_year": 2013,
-      "peak_count": 126,
-      "avg_weekly_cases": 0.9984813971146546,
+      "peak_count": 120,
+      "avg_weekly_cases": 1.0,
       "years_span": 26
     },
     "マイコプラズマ肺炎": {
-      "total_reports": 1317,
-      "total_cases": 10095,
+      "total_reports": 1278,
+      "total_cases": 9682,
       "years_active": [
         2000,
         2001,
@@ -760,13 +760,13 @@
         2025
       ],
       "peak_year": 2024,
-      "peak_count": 1855,
-      "avg_weekly_cases": 7.665148063781321,
+      "peak_count": 1765,
+      "avg_weekly_cases": 7.575899843505478,
       "years_span": 26
     },
     "クラミジア肺炎(オウム病は除く)": {
-      "total_reports": 1317,
-      "total_cases": 579,
+      "total_reports": 1278,
+      "total_cases": 546,
       "years_active": [
         2000,
         2001,
@@ -797,7 +797,7 @@
       ],
       "peak_year": 2015,
       "peak_count": 59,
-      "avg_weekly_cases": 0.4396355353075171,
+      "avg_weekly_cases": 0.4272300469483568,
       "years_span": 26
     },
     "成人麻しん": {
@@ -819,8 +819,8 @@
       "years_span": 8
     },
     "インフルエンザ入院": {
-      "total_reports": 756,
-      "total_cases": 9971,
+      "total_reports": 717,
+      "total_cases": 6286,
       "years_active": [
         2011,
         2012,
@@ -838,14 +838,14 @@
         2024,
         2025
       ],
-      "peak_year": 2019,
-      "peak_count": 1511,
-      "avg_weekly_cases": 13.18915343915344,
+      "peak_year": 2023,
+      "peak_count": 878,
+      "avg_weekly_cases": 8.767085076708508,
       "years_span": 15
     },
     "感染性胃腸炎（ロタウイルス）": {
-      "total_reports": 611,
-      "total_cases": 1030,
+      "total_reports": 583,
+      "total_cases": 932,
       "years_active": [
         2013,
         2014,
@@ -862,45 +862,45 @@
         2025
       ],
       "peak_year": 2017,
-      "peak_count": 235,
-      "avg_weekly_cases": 1.6857610474631752,
+      "peak_count": 220,
+      "avg_weekly_cases": 1.5986277873070327,
       "years_span": 13
     },
     "新型コロナウイルス感染症（COVID-19）": {
-      "total_reports": 112,
-      "total_cases": 202160,
+      "total_reports": 109,
+      "total_cases": 198538,
       "years_active": [
         2023,
         2024,
         2025
       ],
-      "peak_year": 2024,
-      "peak_count": 91965,
-      "avg_weekly_cases": 1805.0,
+      "peak_year": 2023,
+      "peak_count": 89884,
+      "avg_weekly_cases": 1821.4495412844037,
       "years_span": 3
     },
     "COVID-19入院": {
-      "total_reports": 92,
-      "total_cases": 8920,
+      "total_reports": 89,
+      "total_cases": 8668,
       "years_active": [
         2023,
         2024,
         2025
       ],
       "peak_year": 2024,
-      "peak_count": 6194,
-      "avg_weekly_cases": 96.95652173913044,
+      "peak_count": 5972,
+      "avg_weekly_cases": 97.3932584269663,
       "years_span": 3
     },
     "急性呼吸器感染症（ARI）": {
-      "total_reports": 12,
-      "total_cases": 276091,
+      "total_reports": 11,
+      "total_cases": 241436,
       "years_active": [
         2025
       ],
       "peak_year": 2025,
-      "peak_count": 276091,
-      "avg_weekly_cases": 23007.583333333332,
+      "peak_count": 241436,
+      "avg_weekly_cases": 21948.727272727272,
       "years_span": 1
     }
   }
