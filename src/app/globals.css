@@ -3,27 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --foreground-rgb: 17, 24, 39;
+  --background-rgb: 249, 250, 251;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
-
+/* ダークモードを無効化して常にライトモードで表示 */
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background-color: rgb(var(--background-rgb));
+  margin: 0;
+  padding: 0;
 }
 
 @layer utilities {
@@ -33,10 +22,6 @@ body {
 }
 
 /* カスタムスタイル */
-.dashboard-container {
-  @apply min-h-screen bg-gray-50;
-}
-
 .card {
   @apply bg-white rounded-lg shadow-md p-6;
 }
@@ -63,4 +48,11 @@ body {
 
 .loading-spinner {
   @apply animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600;
+}
+
+/* ダークモードを無効化 */
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: light;
+  }
 }
