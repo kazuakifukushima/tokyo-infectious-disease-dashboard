@@ -79,7 +79,12 @@ def process_gender_data(data_dir: str = '../csv_list'):
     Returns:
         (processed_data, diseases_found): 処理済みデータのリストと疾病名のセット
     """
-    gender_files = glob.glob(f'{data_dir}/sentinel_weekly_gender_*_raw.csv')
+    # _raw.csv と通常の .csv の両方のパターンを検索
+    gender_files_raw = glob.glob(f'{data_dir}/sentinel_weekly_gender_*_raw.csv')
+    gender_files_normal = glob.glob(f'{data_dir}/sentinel_weekly_gender_*.csv')
+    # 重複を除去して結合
+    gender_files = list(set(gender_files_raw + gender_files_normal))
+    gender_files.sort()  # ソートして順序を保証
     
     processed_data = []
     diseases_found = set()
