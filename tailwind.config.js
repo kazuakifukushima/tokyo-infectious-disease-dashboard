@@ -5,7 +5,8 @@ module.exports = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
-  darkMode: false, // ダークモードを無効化
+  // ダークモードを無効化（mediaに設定してダークモードを無効化）
+  darkMode: 'media',
   theme: {
     extend: {
       colors: {

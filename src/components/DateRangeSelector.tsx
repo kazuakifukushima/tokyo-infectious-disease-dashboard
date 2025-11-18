@@ -78,11 +78,13 @@ export default function DateRangeSelector({
         break
       case 'last3':
         startYear = Math.max(currentYear - 3, minYear)
-        endYear = maxYear
+        // 現在年と利用可能な最大年の小さい方を使用（データが存在しない現在年を選択しないように）
+        endYear = Math.min(currentYear, maxYear)
         break
       case 'last5':
         startYear = Math.max(currentYear - 5, minYear)
-        endYear = maxYear
+        // 現在年と利用可能な最大年の小さい方を使用（データが存在しない現在年を選択しないように）
+        endYear = Math.min(currentYear, maxYear)
         break
       case 'current':
         startYear = maxYear
@@ -121,7 +123,7 @@ export default function DateRangeSelector({
           <button
             onClick={() => handlePresetSelect('last5')}
             className={`px-3 py-1 text-xs rounded-md transition-colors ${
-              isFiltered && localStartYear === Math.max(new Date().getFullYear() - 5, minYear) && localEndYear === maxYear
+              isFiltered && localStartYear === Math.max(new Date().getFullYear() - 5, minYear) && localEndYear === Math.min(new Date().getFullYear(), maxYear)
                 ? 'bg-primary-600 text-white font-medium'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
@@ -131,7 +133,7 @@ export default function DateRangeSelector({
           <button
             onClick={() => handlePresetSelect('last3')}
             className={`px-3 py-1 text-xs rounded-md transition-colors ${
-              isFiltered && localStartYear === Math.max(new Date().getFullYear() - 3, minYear) && localEndYear === maxYear
+              isFiltered && localStartYear === Math.max(new Date().getFullYear() - 3, minYear) && localEndYear === Math.min(new Date().getFullYear(), maxYear)
                 ? 'bg-primary-600 text-white font-medium'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
