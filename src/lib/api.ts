@@ -10,7 +10,20 @@ import type {
   DateRange
 } from '@/types'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '' : 'http://localhost:8000')
+// 本番環境では /api 経由でアクセス、開発環境では localhost:8000 を使用
+const getApiBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL
+  }
+  if (typeof window !== 'undefined') {
+    // ブラウザ環境: 本番環境では /api、開発環境では localhost:8000
+    return window.location.hostname === 'localhost' ? 'http://localhost:8000' : '/api'
+  }
+  // サーバーサイド: localhost:8000
+  return 'http://localhost:8000'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 const apiInstance = axios.create({
   baseURL: API_BASE_URL,
