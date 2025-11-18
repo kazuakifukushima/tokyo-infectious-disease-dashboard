@@ -16,7 +16,7 @@ import {
 } from 'chart.js'
 import { apiClient } from '@/lib/api'
 import LoadingSpinner from '../LoadingSpinner'
-import type { SummaryData, TopDiseasesResponse, YearlyTrendsResponse } from '@/types'
+import type { SummaryData, TopDiseasesResponse, YearlyTrendsResponse, DateRange } from '@/types'
 
 ChartJS.register(
   CategoryScale,
@@ -32,9 +32,10 @@ ChartJS.register(
 
 interface OverviewViewProps {
   summaryData: SummaryData | null
+  dateRange: DateRange | null
 }
 
-export default function OverviewView({ summaryData }: OverviewViewProps) {
+export default function OverviewView({ summaryData, dateRange }: OverviewViewProps) {
   const [topDiseases, setTopDiseases] = useState<TopDiseasesResponse | null>(null)
   const [yearlyTrends, setYearlyTrends] = useState<YearlyTrendsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -43,9 +44,11 @@ export default function OverviewView({ summaryData }: OverviewViewProps) {
     const fetchData = async () => {
       try {
         setIsLoading(true)
+        const startYear = dateRange?.startYear
+        const endYear = dateRange?.endYear
         const [topDiseasesData, yearlyTrendsData] = await Promise.all([
-          apiClient.getTopDiseases(10),
-          apiClient.getYearlyTrends()
+          apiClient.getTopDiseases(10, undefined, startYear, endYear),
+          apiClient.getYearlyTrends(startYear, endYear)
         ])
         setTopDiseases(topDiseasesData)
         setYearlyTrends(yearlyTrendsData)
@@ -57,7 +60,7 @@ export default function OverviewView({ summaryData }: OverviewViewProps) {
     }
 
     fetchData()
-  }, [])
+  }, [dateRange])
 
   if (isLoading) {
     return (
@@ -209,26 +212,26 @@ export default function OverviewView({ summaryData }: OverviewViewProps) {
             {summaryData && (
               <>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">データ期間:</span>
-                  <span className="font-medium">
+                  <span className="text-gray-700">データ期間:</span>
+                  <span className="font-medium text-gray-900">
                     {new Date(summaryData.date_range.start).getFullYear()} - {new Date(summaryData.date_range.end).getFullYear()}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">最新年度総報告数:</span>
-                  <span className="font-medium">
+                  <span className="text-gray-700">最新年度総報告数:</span>
+                  <span className="font-medium text-gray-900">
                     {Object.values(summaryData.yearly_totals).slice(-1)[0]?.toLocaleString() || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">最多報告感染症:</span>
-                  <span className="font-medium">
+                  <span className="text-gray-700">最多報告感染症:</span>
+                  <span className="font-medium text-gray-900">
                     {Object.keys(summaryData.top_diseases)[0] || '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">最多報告数:</span>
-                  <span className="font-medium">
+                  <span className="text-gray-700">最多報告数:</span>
+                  <span className="font-medium text-gray-900">
                     {Object.values(summaryData.top_diseases)[0]?.toLocaleString() || 0}
                   </span>
                 </div>

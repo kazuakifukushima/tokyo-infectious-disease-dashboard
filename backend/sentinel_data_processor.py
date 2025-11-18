@@ -69,11 +69,16 @@ def read_sentinel_csv(filepath):
         print(f"Error reading {filepath}: {e}")
         return None, None
 
-def process_gender_data():
+def process_gender_data(data_dir: str = '../csv_list'):
     """
     男女別データを処理してインフルエンザなどの主要疾患を抽出
+    
+    Args:
+        data_dir: CSVファイルが保存されているディレクトリパス
+    
+    Returns:
+        (processed_data, diseases_found): 処理済みデータのリストと疾病名のセット
     """
-    data_dir = '../csv_list'
     gender_files = glob.glob(f'{data_dir}/sentinel_weekly_gender_*_raw.csv')
     
     processed_data = []

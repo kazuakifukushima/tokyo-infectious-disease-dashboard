@@ -66,11 +66,18 @@ class SimpleDataProcessor:
     
     def _extract_date_from_filename(self, filename):
         """ファイル名から年と週番号を抽出"""
-        # notifiable_weekly_2000_1_20250703_031821_raw.csv の形式
-        pattern = r'notifiable_weekly_(\d{4})_(\d+)_\d+_\d+_raw\.csv'
-        match = re.match(pattern, filename)
+        # パターン1: notifiable_weekly_2000_1_20250703_031821_raw.csv の形式
+        pattern1 = r'notifiable_weekly_(\d{4})_(\d+)_\d+_\d+_raw\.csv'
+        match = re.match(pattern1, filename)
         if match:
             return int(match.group(1)), int(match.group(2))
+        
+        # パターン2: notifiable_weekly_2000_01.csv の形式
+        pattern2 = r'notifiable_weekly_(\d{4})_(\d+)\.csv'
+        match = re.match(pattern2, filename)
+        if match:
+            return int(match.group(1)), int(match.group(2))
+        
         return None
     
     def _week_to_date(self, year, week):

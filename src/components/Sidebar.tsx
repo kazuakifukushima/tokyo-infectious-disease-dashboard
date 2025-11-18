@@ -14,22 +14,22 @@ const navigationItems = [
     description: '全体的な発生動向'
   },
   {
+    id: 'trends' as ViewType,
+    name: '時系列分析',
+    icon: '📈',
+    description: '長期トレンド分析'
+  },
+  {
     id: 'diseases' as ViewType,
     name: '疾病別分析',
     icon: '🦠',
     description: '個別疾病の詳細'
   },
   {
-    id: 'categories' as ViewType,
-    name: '分類別統計',
-    icon: '📋',
-    description: '法定分類別の集計'
-  },
-  {
-    id: 'trends' as ViewType,
-    name: '時系列分析',
-    icon: '📈',
-    description: '長期トレンド分析'
+    id: 'sentinel' as ViewType,
+    name: '定点把握疾患',
+    icon: '🏥',
+    description: 'インフルエンザ・COVID-19等'
   }
 ]
 

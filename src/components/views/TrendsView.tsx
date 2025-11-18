@@ -15,7 +15,7 @@ import {
 } from 'chart.js'
 import { apiClient } from '@/lib/api'
 import LoadingSpinner from '../LoadingSpinner'
-import type { YearlyTrendsResponse, TopDiseasesResponse } from '@/types'
+import type { YearlyTrendsResponse, TopDiseasesResponse, DateRange } from '@/types'
 
 ChartJS.register(
   CategoryScale,
@@ -28,20 +28,41 @@ ChartJS.register(
   Legend
 )
 
-export default function TrendsView() {
+interface TrendsViewProps {
+  dateRange: DateRange | null
+}
+
+export default function TrendsView({ dateRange }: TrendsViewProps) {
   const [yearlyTrends, setYearlyTrends] = useState<YearlyTrendsResponse | null>(null)
   const [recentTrends, setRecentTrends] = useState<TopDiseasesResponse | null>(null)
   const [selectedYear, setSelectedYear] = useState<number>(2024)
   const [isLoading, setIsLoading] = useState(true)
   const [isYearDataLoading, setIsYearDataLoading] = useState(false)
 
+  // dateRangeが変更されたときにselectedYearを更新
+  useEffect(() => {
+    if (dateRange && dateRange.startYear === dateRange.endYear) {
+      // 単年選択の場合
+      setSelectedYear(dateRange.startYear)
+    } else if (dateRange) {
+      // 期間選択の場合、終了年を選択
+      setSelectedYear(dateRange.endYear)
+    }
+  }, [dateRange])
+
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         setIsLoading(true)
+        // dateRangeが単年（startYear === endYear）の場合も正しく処理
+        const trendsParams = dateRange ? {
+          start_year: dateRange.startYear,
+          end_year: dateRange.endYear
+        } : undefined
+        
         const [trendsData, recentData] = await Promise.all([
-          apiClient.getYearlyTrends(),
-          apiClient.getTopDiseases(10, 2024)
+          apiClient.getYearlyTrends(trendsParams?.start_year, trendsParams?.end_year),
+          apiClient.getTopDiseases(10, selectedYear, trendsParams?.start_year, trendsParams?.end_year)
         ])
         setYearlyTrends(trendsData)
         setRecentTrends(recentData)
@@ -53,18 +74,22 @@ export default function TrendsView() {
     }
 
     fetchInitialData()
-  }, [])
+  }, [dateRange, selectedYear])
 
   useEffect(() => {
     if (selectedYear) {
       fetchYearData()
     }
-  }, [selectedYear])
+  }, [selectedYear, dateRange])
 
   const fetchYearData = async () => {
     try {
       setIsYearDataLoading(true)
-      const data = await apiClient.getTopDiseases(10, selectedYear)
+      const params = dateRange ? {
+        start_year: dateRange.startYear,
+        end_year: dateRange.endYear
+      } : undefined
+      const data = await apiClient.getTopDiseases(10, selectedYear, params?.start_year, params?.end_year)
       setRecentTrends(data)
     } catch (error) {
       console.error('年別データ取得エラー:', error)
@@ -185,10 +210,10 @@ export default function TrendsView() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="px-3 py-1 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               {availableYears.map((year) => (
-                <option key={year} value={year}>
+                <option key={year} value={year} className="text-gray-900 bg-white">
                   {year}年
                 </option>
               ))}
@@ -217,9 +242,9 @@ export default function TrendsView() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3">年</th>
-                  <th className="text-right py-2 px-3">報告数</th>
-                  <th className="text-right py-2 px-3">前年比</th>
+                  <th className="text-left py-2 px-3 text-gray-900 font-semibold">年</th>
+                  <th className="text-right py-2 px-3 text-gray-900 font-semibold">報告数</th>
+                  <th className="text-right py-2 px-3 text-gray-900 font-semibold">前年比</th>
                 </tr>
               </thead>
               <tbody>
@@ -230,12 +255,12 @@ export default function TrendsView() {
                   
                   return (
                     <tr key={trend.year} className="border-b border-gray-100">
-                      <td className="py-2 px-3 font-medium">{trend.year}年</td>
-                      <td className="text-right py-2 px-3 font-mono">
+                      <td className="py-2 px-3 font-medium text-gray-900">{trend.year}年</td>
+                      <td className="text-right py-2 px-3 font-mono text-gray-900">
                         {trend.total_count.toLocaleString()}
                       </td>
                       <td className={`text-right py-2 px-3 font-mono ${
-                        changePercent === null ? 'text-gray-400' :
+                        changePercent === null ? 'text-gray-500' :
                         changePercent > 0 ? 'text-red-600' : 'text-green-600'
                       }`}>
                         {changePercent === null ? '-' : 
@@ -262,22 +287,22 @@ export default function TrendsView() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-3">順位</th>
-                    <th className="text-left py-2 px-3">感染症名</th>
-                    <th className="text-right py-2 px-3">報告数</th>
-                    <th className="text-left py-2 px-3">分類</th>
+                    <th className="text-left py-2 px-3 text-gray-900 font-semibold">順位</th>
+                    <th className="text-left py-2 px-3 text-gray-900 font-semibold">感染症名</th>
+                    <th className="text-right py-2 px-3 text-gray-900 font-semibold">報告数</th>
+                    <th className="text-left py-2 px-3 text-gray-900 font-semibold">分類</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentTrends.top_diseases.map((disease, index) => (
                     <tr key={disease.disease_name} className="border-b border-gray-100">
-                      <td className="py-2 px-3 font-medium">{index + 1}</td>
-                      <td className="py-2 px-3">{disease.disease_name}</td>
-                      <td className="text-right py-2 px-3 font-mono">
+                      <td className="py-2 px-3 font-medium text-gray-900">{index + 1}</td>
+                      <td className="py-2 px-3 text-gray-900">{disease.disease_name}</td>
+                      <td className="text-right py-2 px-3 font-mono text-gray-900">
                         {disease.total_count.toLocaleString()}
                       </td>
                       <td className="py-2 px-3 text-xs">
-                        <span className="px-2 py-1 bg-gray-100 rounded">
+                        <span className="px-2 py-1 bg-gray-100 rounded text-gray-900">
                           {disease.category}
                         </span>
                       </td>

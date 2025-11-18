@@ -5,20 +5,22 @@ import Dashboard from '@/components/Dashboard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import LoadingSpinner from '@/components/LoadingSpinner'
+import DateRangeSelector from '@/components/DateRangeSelector'
 import { apiClient } from '@/lib/api'
-import type { SummaryData } from '@/types'
+import type { SummaryData, DateRange } from '@/types'
 
 export default function Home() {
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeView, setActiveView] = useState<'overview' | 'diseases' | 'categories' | 'trends'>('overview')
+  const [activeView, setActiveView] = useState<'overview' | 'diseases' | 'trends' | 'sentinel'>('overview')
+  const [dateRange, setDateRange] = useState<DateRange | null>(null)
 
   useEffect(() => {
     const fetchSummaryData = async () => {
       try {
         setIsLoading(true)
-        const data = await apiClient.getSummary()
+        const data = await apiClient.getSummary(dateRange || undefined)
         setSummaryData(data)
         setError(null)
       } catch (err) {
@@ -30,7 +32,7 @@ export default function Home() {
     }
 
     fetchSummaryData()
-  }, [])
+  }, [dateRange])
 
   if (isLoading) {
     return (
@@ -59,13 +61,32 @@ export default function Home() {
     )
   }
 
+  const handleDateRangeChange = (range: DateRange | null) => {
+    setDateRange(range)
+  }
+
+  const availableYears = summaryData?.years_covered || []
+  const defaultStartYear = availableYears.length > 0 ? Math.min(...availableYears) : new Date().getFullYear()
+  const defaultEndYear = availableYears.length > 0 ? Math.max(...availableYears) : new Date().getFullYear()
+
   return (
     <div className="flex h-screen">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header summaryData={summaryData} />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
-          <Dashboard activeView={activeView} summaryData={summaryData} />
+          <div className="p-4 border-b border-gray-200 bg-white">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-lg font-semibold text-gray-900">データ期間</h2>
+              <DateRangeSelector
+                availableYears={availableYears}
+                selectedRange={dateRange || { startYear: defaultStartYear, endYear: defaultEndYear }}
+                onRangeChange={handleDateRangeChange}
+                isFiltered={dateRange !== null}
+              />
+            </div>
+          </div>
+          <Dashboard activeView={activeView} summaryData={summaryData} dateRange={dateRange} />
         </main>
       </div>
     </div>

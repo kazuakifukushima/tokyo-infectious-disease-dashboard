@@ -73,10 +73,23 @@ export interface DiseasesResponse {
   diseases: string[]
 }
 
-export type ViewType = 'overview' | 'diseases' | 'categories' | 'trends'
+export type ViewType = 'overview' | 'diseases' | 'trends' | 'sentinel'
 
 export interface ChartDataPoint {
   x: string | number
   y: number
   label?: string
+}
+
+export interface DateRange {
+  startYear: number
+  endYear: number
+}
+
+export interface FilteredSummaryData extends SummaryData {
+  filtered_total_records: number
+  filtered_date_range: {
+    start: string
+    end: string
+  }
 }

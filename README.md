@@ -6,7 +6,6 @@
 
 - **概況ダッシュボード**: 全体的な感染症発生動向の把握
 - **疾病別分析**: 個別感染症の詳細な時系列分析
-- **分類別統計**: 法定感染症分類別の統計情報
 - **時系列分析**: 長期的なトレンド分析と予測
 
 ## 📊 データ概要
@@ -123,11 +122,6 @@ python -m http.server 8080
 3. 時系列グラフで発生動向を確認
 4. 統計データテーブルで詳細を確認
 
-### 分類別統計
-- 感染症法による法定分類別の統計
-- 分類別報告数と疾病数の比較
-- 各分類の詳細説明
-
 ### 時系列分析
 - 年別トレンド分析
 - 特定年度の詳細分析
@@ -140,8 +134,14 @@ idsc_dashboard/
 ├── backend/                  # バックエンド
 │   ├── main.py              # FastAPI アプリケーション
 │   ├── simple_data_processor.py  # データ処理スクリプト
+│   ├── github_fetcher.py    # GitHubリポジトリからデータ取得
+│   ├── data_updater.py      # データ更新処理
+│   ├── update_data_scheduled.py  # 定期実行スクリプト
 │   ├── processed_data/      # 処理済みデータ
 │   └── requirements.txt     # Python依存関係
+├── .github/
+│   └── workflows/
+│       └── update-data.yml   # GitHub Actionsワークフロー
 ├── src/                     # フロントエンド
 │   ├── app/                 # Next.js App Router
 │   ├── components/          # Reactコンポーネント
@@ -157,7 +157,6 @@ idsc_dashboard/
 ### サイドバーナビゲーション
 - 📊 概況: 全体サマリー
 - 🦠 疾病別分析: 個別疾病の詳細
-- 📋 分類別統計: 法定分類別集計
 - 📈 時系列分析: 長期トレンド
 
 ### メイン画面
@@ -184,6 +183,44 @@ npm run setup-data
 npm run lint
 ```
 
+## 🔄 データ自動更新
+
+このダッシュボードは、GitHubリポジトリ（[fetch-tokyo-idsc-github-actions](https://github.com/kambarakun/fetch-tokyo-idsc-github-actions)）から定期的に新しいデータを取得して自動更新する機能を備えています。
+
+### 自動更新の仕組み
+
+1. **GitHubリポジトリから取得**: GitHub APIを使用して新しいCSVファイルを検出・ダウンロード
+2. **データ統合**: 既存データと新しいデータを統合（重複チェック）
+3. **処理・保存**: CSVファイルを処理してダッシュボード用の形式に変換
+4. **自動反映**: バックエンドAPIが新しいデータを読み込み、ダッシュボードに反映
+
+### 更新方法
+
+#### 手動実行
+```bash
+cd backend
+python update_data_scheduled.py
+```
+
+#### API経由での実行
+```bash
+# 更新状態を確認
+curl http://localhost:8000/update-status
+
+# データを更新（非同期）
+curl -X POST http://localhost:8000/update-data
+
+# データを更新（同期）
+curl -X POST http://localhost:8000/update-data-sync
+```
+
+#### GitHub Actionsでの自動実行
+`.github/workflows/update-data.yml` が設定されており、以下のスケジュールで自動実行されます：
+- **毎日午前3時（JST）**: 自動的にデータを更新
+- **手動実行**: GitHub ActionsのUIから手動で実行可能
+
+詳細は `backend/DATA_UPDATE_README.md` を参照してください。
+
 ## 📄 API エンドポイント
 
 ### 基本情報
@@ -194,10 +231,12 @@ npm run lint
 ### データ取得
 - `GET /diseases/{disease_name}/timeseries` - 疾病別時系列データ
 - `GET /diseases/top` - 上位感染症
-- `GET /categories` - 分類別統計
 - `GET /yearly-trends` - 年次推移
 
-### 管理
+### データ更新
+- `GET /update-status` - データ更新状態を取得
+- `POST /update-data` - データを更新（非同期処理）
+- `POST /update-data-sync` - データを更新（同期処理）
 - `GET /reload-data` - データ再読み込み
 
 ## 🔐 セキュリティ
