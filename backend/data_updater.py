@@ -309,6 +309,45 @@ class DataUpdater:
                             if self.github_fetcher.download_file(file_info["download_url"], save_path):
                                 downloaded_files.append(save_path)
                     
+                    # 既存ファイルから最新の週を確認し、不足している週のファイルを直接ダウンロード
+                    import re
+                    existing_weeks = set()
+                    for filename in existing_sentinel_files:
+                        match = re.search(r'sentinel_weekly_gender_2025_(\d+)', filename)
+                        if match:
+                            existing_weeks.add(int(match.group(1)))
+                    
+                    # 2025年の最新週を確認（第47週まで）
+                    current_year = 2025
+                    max_week = 47  # 現在の最新週
+                    
+                    # 不足している週のファイルを直接ダウンロード
+                    missing_weeks = []
+                    for week in range(1, max_week + 1):
+                        if week not in existing_weeks:
+                            missing_weeks.append(week)
+                    
+                    if missing_weeks:
+                        logger.info(f"不足している週のファイルを直接ダウンロードします: {len(missing_weeks)}週分")
+                        import requests
+                        raw_base_url = f"https://raw.githubusercontent.com/{self.github_fetcher.repo_owner}/{self.github_fetcher.repo_name}/main/data/raw"
+                        
+                        for week in missing_weeks[:30]:  # 一度に30週まで（レート制限対策）
+                            filename = f"sentinel_weekly_gender_{current_year}_{week}.csv"
+                            if filename not in existing_sentinel_files:
+                                url = f"{raw_base_url}/{filename}"
+                                save_path = os.path.join(self.csv_dir, filename)
+                                
+                                try:
+                                    response = requests.get(url, timeout=10)
+                                    if response.status_code == 200:
+                                        with open(save_path, 'wb') as f:
+                                            f.write(response.content)
+                                        downloaded_files.append(save_path)
+                                        logger.debug(f"直接ダウンロード成功: {filename}")
+                                except Exception as e:
+                                    logger.debug(f"直接ダウンロード失敗 {filename}: {str(e)}")
+                    
                     result["downloaded_files"] = len(downloaded_files)
                     logger.info(f"定点把握疾患ファイルを {len(downloaded_files)} 件ダウンロードしました")
                 except Exception as e:
