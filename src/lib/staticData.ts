@@ -40,9 +40,12 @@ export async function loadStaticSummaryData(): Promise<SummaryData | null> {
   }
   
   try {
-    const response = await fetch('/data/summary_statistics.json')
+    // Vercel環境では /data/ パスでアクセス可能
+    const response = await fetch('/data/summary_statistics.json', {
+      cache: 'no-cache'
+    })
     if (!response.ok) {
-      console.warn('静的サマリーデータの読み込みに失敗しました')
+      console.warn(`静的サマリーデータの読み込みに失敗しました: ${response.status} ${response.statusText}`)
       return null
     }
     cachedSummaryData = await response.json()
@@ -62,9 +65,11 @@ export async function loadStaticDiseaseList(): Promise<string[] | null> {
   }
   
   try {
-    const response = await fetch('/data/disease_list.json')
+    const response = await fetch('/data/disease_list.json', {
+      cache: 'no-cache'
+    })
     if (!response.ok) {
-      console.warn('静的疾病リストの読み込みに失敗しました')
+      console.warn(`静的疾病リストの読み込みに失敗しました: ${response.status} ${response.statusText}`)
       return null
     }
     cachedDiseaseList = await response.json()
@@ -84,9 +89,11 @@ export async function loadStaticSentinelDiseaseList(): Promise<string[] | null> 
   }
   
   try {
-    const response = await fetch('/data/sentinel_disease_list.json')
+    const response = await fetch('/data/sentinel_disease_list.json', {
+      cache: 'no-cache'
+    })
     if (!response.ok) {
-      console.warn('静的定点把握疾患リストの読み込みに失敗しました')
+      console.warn(`静的定点把握疾患リストの読み込みに失敗しました: ${response.status} ${response.statusText}`)
       return null
     }
     cachedSentinelDiseaseList = await response.json()

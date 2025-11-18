@@ -20,12 +20,19 @@ export default function Home() {
     const fetchSummaryData = async () => {
       try {
         setIsLoading(true)
-        const data = await apiClient.getSummary(dateRange || undefined)
-        setSummaryData(data)
         setError(null)
-      } catch (err) {
+        const data = await apiClient.getSummary(dateRange || undefined)
+        if (data) {
+          setSummaryData(data)
+          setError(null)
+        } else {
+          setError('データが見つかりませんでした')
+        }
+      } catch (err: any) {
         console.error('データ取得エラー:', err)
-        setError('データの取得に失敗しました')
+        // エラーメッセージをより詳細に
+        const errorMessage = err?.message || 'データの取得に失敗しました'
+        setError(errorMessage)
       } finally {
         setIsLoading(false)
       }

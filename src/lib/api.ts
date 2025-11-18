@@ -76,12 +76,24 @@ export const apiClient = {
       const response = await apiInstance.get<SummaryData>(url)
       return response.data
     } catch (error: any) {
-      // API接続に失敗した場合、静的データから読み込む
-      if (error.message?.includes('ネットワークエラー') || error.message?.includes('接続できません')) {
-        console.warn('API接続に失敗したため、静的データから読み込みます')
-        const staticData = await loadStaticSummaryData()
-        if (staticData) {
-          return staticData
+      // Vercel環境またはAPI接続に失敗した場合、静的データから読み込む
+      const isVercelEnv = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      const isNetworkError = error.message?.includes('ネットワークエラー') || 
+                            error.message?.includes('接続できません') ||
+                            error.code === 'ECONNREFUSED' ||
+                            error.code === 'ERR_NETWORK' ||
+                            (error.response && error.response.status >= 500) ||
+                            !error.response
+      
+      if (isVercelEnv || isNetworkError) {
+        console.warn('API接続に失敗したため、静的データから読み込みます', error.message)
+        try {
+          const staticData = await loadStaticSummaryData()
+          if (staticData) {
+            return staticData
+          }
+        } catch (staticError) {
+          console.error('静的データの読み込みにも失敗しました', staticError)
         }
       }
       throw error
@@ -93,12 +105,24 @@ export const apiClient = {
       const response = await apiInstance.get<DiseasesResponse>('/diseases')
       return response.data
     } catch (error: any) {
-      // API接続に失敗した場合、静的データから読み込む
-      if (error.message?.includes('ネットワークエラー') || error.message?.includes('接続できません')) {
-        console.warn('API接続に失敗したため、静的データから読み込みます')
-        const staticList = await loadStaticDiseaseList()
-        if (staticList) {
-          return { diseases: staticList }
+      // Vercel環境またはAPI接続に失敗した場合、静的データから読み込む
+      const isVercelEnv = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      const isNetworkError = error.message?.includes('ネットワークエラー') || 
+                            error.message?.includes('接続できません') ||
+                            error.code === 'ECONNREFUSED' ||
+                            error.code === 'ERR_NETWORK' ||
+                            (error.response && error.response.status >= 500) ||
+                            !error.response
+      
+      if (isVercelEnv || isNetworkError) {
+        console.warn('API接続に失敗したため、静的データから読み込みます', error.message)
+        try {
+          const staticList = await loadStaticDiseaseList()
+          if (staticList) {
+            return { diseases: staticList }
+          }
+        } catch (staticError) {
+          console.error('静的データの読み込みにも失敗しました', staticError)
         }
       }
       throw error
@@ -188,12 +212,24 @@ export const apiClient = {
       const response = await apiInstance.get('/sentinel/diseases')
       return response.data
     } catch (error: any) {
-      // API接続に失敗した場合、静的データから読み込む
-      if (error.message?.includes('ネットワークエラー') || error.message?.includes('接続できません')) {
-        console.warn('API接続に失敗したため、静的データから読み込みます')
-        const staticList = await loadStaticSentinelDiseaseList()
-        if (staticList) {
-          return { diseases: staticList }
+      // Vercel環境またはAPI接続に失敗した場合、静的データから読み込む
+      const isVercelEnv = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      const isNetworkError = error.message?.includes('ネットワークエラー') || 
+                            error.message?.includes('接続できません') ||
+                            error.code === 'ECONNREFUSED' ||
+                            error.code === 'ERR_NETWORK' ||
+                            (error.response && error.response.status >= 500) ||
+                            !error.response
+      
+      if (isVercelEnv || isNetworkError) {
+        console.warn('API接続に失敗したため、静的データから読み込みます', error.message)
+        try {
+          const staticList = await loadStaticSentinelDiseaseList()
+          if (staticList) {
+            return { diseases: staticList }
+          }
+        } catch (staticError) {
+          console.error('静的データの読み込みにも失敗しました', staticError)
         }
       }
       throw error
