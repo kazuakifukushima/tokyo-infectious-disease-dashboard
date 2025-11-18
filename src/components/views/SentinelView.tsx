@@ -42,6 +42,8 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
   const [aggregationMode, setAggregationMode] = useState<'weekly' | 'monthly' | 'yearly'>('weekly')
   const [summaryData, setSummaryData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selectedYears, setSelectedYears] = useState<number[]>([])
+  const [yearlyData, setYearlyData] = useState<Record<number, DiseaseTimeSeriesResponse>>({})
 
   useEffect(() => {
     const fetchDiseases = async () => {
@@ -69,11 +71,23 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
     if (dateRange) {
       setStartYear(dateRange.startYear)
       setEndYear(dateRange.endYear)
+      // 年毎比較用の選択年を設定
+      const years: number[] = []
+      for (let year = dateRange.startYear; year <= dateRange.endYear; year++) {
+        years.push(year)
+      }
+      setSelectedYears(years.length > 0 ? years : [dateRange.endYear])
     } else {
       // デフォルト値: 過去5年間
       const currentYear = new Date().getFullYear()
       setStartYear(currentYear - 5)
       setEndYear(currentYear)
+      // デフォルトで直近5年を選択
+      const years: number[] = []
+      for (let year = currentYear - 4; year <= currentYear; year++) {
+        years.push(year)
+      }
+      setSelectedYears(years)
     }
   }, [dateRange])
 
@@ -81,33 +95,73 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
     const fetchTimeSeries = async () => {
       if (!selectedDisease) {
         setTimeSeriesData(null)
+        setYearlyData({})
         return
       }
 
       try {
         setIsChartLoading(true)
-        const data = await apiClient.getSentinelDiseaseTimeSeries(
-          selectedDisease,
-          startYear,
-          endYear
-        )
-        if (data && data.data) {
-          setTimeSeriesData(data)
+        
+        // 年毎比較モード（週毎集計時のみ）
+        if (aggregationMode === 'weekly' && selectedYears.length > 0) {
+          const yearlyDataMap: Record<number, DiseaseTimeSeriesResponse> = {}
+          
+          // 各年のデータを取得
+          for (const year of selectedYears) {
+            try {
+              const data = await apiClient.getSentinelDiseaseTimeSeries(
+                selectedDisease,
+                year,
+                year
+              )
+              if (data && data.data) {
+                yearlyDataMap[year] = data
+              }
+            } catch (err) {
+              console.warn(`${year}年のデータ取得に失敗:`, err)
+            }
+          }
+          
+          setYearlyData(yearlyDataMap)
+          
+          // 全体のデータも取得（後方互換性のため）
+          const data = await apiClient.getSentinelDiseaseTimeSeries(
+            selectedDisease,
+            startYear,
+            endYear
+          )
+          if (data && data.data) {
+            setTimeSeriesData(data)
+          } else {
+            setTimeSeriesData(null)
+          }
         } else {
-          console.warn('時系列データが空です')
-          setTimeSeriesData(null)
+          // 通常モード
+          const data = await apiClient.getSentinelDiseaseTimeSeries(
+            selectedDisease,
+            startYear,
+            endYear
+          )
+          if (data && data.data) {
+            setTimeSeriesData(data)
+          } else {
+            console.warn('時系列データが空です')
+            setTimeSeriesData(null)
+          }
+          setYearlyData({})
         }
       } catch (error: any) {
         console.error('時系列データ取得エラー:', error)
         setError(error?.message || 'データの取得に失敗しました')
         setTimeSeriesData(null)
+        setYearlyData({})
       } finally {
         setIsChartLoading(false)
       }
     }
 
     fetchTimeSeries()
-  }, [selectedDisease, startYear, endYear])
+  }, [selectedDisease, startYear, endYear, aggregationMode, selectedYears])
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -175,8 +229,92 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [timeSeriesData, aggregationMode])
 
+  // 年毎比較用のチャートデータ準備
+  const yearlyComparisonChartData = useMemo(() => {
+    if (aggregationMode !== 'weekly' || selectedYears.length === 0 || Object.keys(yearlyData).length === 0) {
+      return null
+    }
+
+    // 週番号（1-52）をX軸に使用
+    const weekLabels = Array.from({ length: 52 }, (_, i) => `第${i + 1}週`)
+    
+    // 各年のデータを週番号で整理
+    const datasets = selectedYears.map((year, index) => {
+      const yearData = yearlyData[year]
+      if (!yearData || !yearData.data) {
+        return null
+      }
+
+      // 週番号をキーにしたマップを作成
+      const weekDataMap: Record<number, number> = {}
+      yearData.data.forEach(item => {
+        // date形式: "2024-W01" または "2024-01-01" など
+        const weekMatch = item.date.match(/W(\d+)/)
+        if (weekMatch) {
+          const week = parseInt(weekMatch[1])
+          weekDataMap[week] = (weekDataMap[week] || 0) + item.value
+        } else {
+          // 日付形式の場合、週番号を計算
+          const dateMatch = item.date.match(/(\d{4})-(\d{2})-(\d{2})/)
+          if (dateMatch) {
+            const date = new Date(parseInt(dateMatch[1]), parseInt(dateMatch[2]) - 1, parseInt(dateMatch[3]))
+            const week = getWeekNumber(date)
+            weekDataMap[week] = (weekDataMap[week] || 0) + item.value
+          }
+        }
+      })
+
+      // 週番号順にデータを配列化
+      const data = weekLabels.map((_, weekIndex) => {
+        const week = weekIndex + 1
+        return weekDataMap[week] || 0
+      })
+
+      // 色を生成（各年に異なる色を割り当て）
+      const colors = [
+        { border: 'rgb(59, 130, 246)', background: 'rgba(59, 130, 246, 0.1)' },
+        { border: 'rgb(34, 197, 94)', background: 'rgba(34, 197, 94, 0.1)' },
+        { border: 'rgb(239, 68, 68)', background: 'rgba(239, 68, 68, 0.1)' },
+        { border: 'rgb(251, 146, 60)', background: 'rgba(251, 146, 60, 0.1)' },
+        { border: 'rgb(168, 85, 247)', background: 'rgba(168, 85, 247, 0.1)' },
+        { border: 'rgb(236, 72, 153)', background: 'rgba(236, 72, 153, 0.1)' },
+        { border: 'rgb(14, 165, 233)', background: 'rgba(14, 165, 233, 0.1)' },
+      ]
+      const color = colors[index % colors.length]
+
+      return {
+        label: `${year}年`,
+        data,
+        borderColor: color.border,
+        backgroundColor: color.background,
+        tension: 0.1,
+        fill: false,
+      }
+    }).filter(Boolean) as any[]
+
+    return {
+      labels: weekLabels,
+      datasets,
+    }
+  }, [yearlyData, selectedYears, aggregationMode])
+
+  // 週番号を計算する関数
+  const getWeekNumber = (date: Date): number => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const dayNum = d.getUTCDay() || 7
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  }
+
   // チャートデータの準備
   const chartData = useMemo(() => {
+    // 年毎比較モードの場合
+    if (yearlyComparisonChartData) {
+      return yearlyComparisonChartData
+    }
+
+    // 通常モード
     if (!aggregateData || aggregateData.length === 0) {
       return {
         labels: [],
@@ -196,7 +334,7 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
         },
       ],
     }
-  }, [aggregateData, selectedDisease])
+  }, [aggregateData, selectedDisease, yearlyComparisonChartData])
 
   const chartOptions = {
     responsive: true,
@@ -207,12 +345,24 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
       },
       title: {
         display: true,
-        text: `${selectedDisease || '定点把握疾患'} の発生動向（${aggregationMode === 'weekly' ? '週毎' : aggregationMode === 'monthly' ? '月毎' : '年毎'}）`,
+        text: aggregationMode === 'weekly' && selectedYears.length > 1
+          ? `${selectedDisease || '定点把握疾患'} の年毎比較（週毎）`
+          : `${selectedDisease || '定点把握疾患'} の発生動向（${aggregationMode === 'weekly' ? '週毎' : aggregationMode === 'monthly' ? '月毎' : '年毎'}）`,
       },
     },
     scales: {
       y: {
         beginAtZero: true,
+        title: {
+          display: true,
+          text: '報告数',
+        },
+      },
+      x: {
+        title: {
+          display: true,
+          text: aggregationMode === 'weekly' && selectedYears.length > 1 ? '週番号' : (aggregationMode === 'weekly' ? '週' : aggregationMode === 'monthly' ? '月' : '年'),
+        },
       },
     },
   }
@@ -296,7 +446,13 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
             </label>
             <select
               value={aggregationMode}
-              onChange={(e) => setAggregationMode(e.target.value as 'weekly' | 'monthly' | 'yearly')}
+              onChange={(e) => {
+                setAggregationMode(e.target.value as 'weekly' | 'monthly' | 'yearly')
+                // 週毎以外の場合は年毎比較を無効化
+                if (e.target.value !== 'weekly') {
+                  setYearlyData({})
+                }
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="weekly">週毎</option>
@@ -305,6 +461,37 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
             </select>
           </div>
         </div>
+
+        {/* 年毎比較設定（週毎モード時のみ） */}
+        {aggregationMode === 'weekly' && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              年毎比較（複数選択可）
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i).map((year) => (
+                <label key={year} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedYears.includes(year)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedYears([...selectedYears, year].sort())
+                      } else {
+                        setSelectedYears(selectedYears.filter(y => y !== year))
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-900">{year}年</span>
+                </label>
+              ))}
+            </div>
+            {selectedYears.length === 0 && (
+              <p className="mt-2 text-sm text-yellow-600">少なくとも1つの年を選択してください</p>
+            )}
+          </div>
+        )}
 
         {/* 統計情報 */}
         {statistics && (
