@@ -15,10 +15,15 @@ import glob
 def parse_filename(filename):
     """
     ファイル名からメタデータを抽出
-    例: sentinel_weekly_gender_2020_17_20250703_031821_raw.csv
+    例: 
+    - sentinel_weekly_gender_2020_17_20250703_031821_raw.csv
+    - sentinel_weekly_gender_2025_47.csv
     """
-    pattern = r'sentinel_weekly_(\w+)_(\d{4})_(\d+)_\d+_\d+_raw\.csv'
-    match = re.match(pattern, os.path.basename(filename))
+    basename = os.path.basename(filename)
+    
+    # パターン1: _raw.csv サフィックス付き
+    pattern1 = r'sentinel_weekly_(\w+)_(\d{4})_(\d+)_\d+_\d+_raw\.csv'
+    match = re.match(pattern1, basename)
     
     if match:
         data_type = match.group(1)  # gender, age, health_center, medical_district
@@ -29,6 +34,21 @@ def parse_filename(filename):
             'year': year,
             'week': week
         }
+    
+    # パターン2: 通常の .csv ファイル（例: sentinel_weekly_gender_2025_47.csv）
+    pattern2 = r'sentinel_weekly_(\w+)_(\d{4})_(\d+)\.csv'
+    match = re.match(pattern2, basename)
+    
+    if match:
+        data_type = match.group(1)
+        year = int(match.group(2))
+        week = int(match.group(3))
+        return {
+            'data_type': data_type,
+            'year': year,
+            'week': week
+        }
+    
     return None
 
 def read_sentinel_csv(filepath):
