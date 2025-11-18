@@ -9,6 +9,7 @@ import type {
   DiseasesResponse,
   DateRange
 } from '@/types'
+import { loadStaticSummaryData, loadStaticDiseaseList, loadStaticSentinelDiseaseList } from './staticData'
 
 // 本番環境では /api 経由でアクセス、開発環境では localhost:8000 を使用
 const getApiBaseUrl = () => {
@@ -64,20 +65,44 @@ export const apiClient = {
   },
 
   async getSummary(dateRange?: DateRange): Promise<SummaryData> {
-    const params = new URLSearchParams()
-    if (dateRange) {
-      params.append('start_year', dateRange.startYear.toString())
-      params.append('end_year', dateRange.endYear.toString())
+    try {
+      const params = new URLSearchParams()
+      if (dateRange) {
+        params.append('start_year', dateRange.startYear.toString())
+        params.append('end_year', dateRange.endYear.toString())
+      }
+      
+      const url = dateRange ? `/summary?${params.toString()}` : '/summary'
+      const response = await apiInstance.get<SummaryData>(url)
+      return response.data
+    } catch (error: any) {
+      // API接続に失敗した場合、静的データから読み込む
+      if (error.message?.includes('ネットワークエラー') || error.message?.includes('接続できません')) {
+        console.warn('API接続に失敗したため、静的データから読み込みます')
+        const staticData = await loadStaticSummaryData()
+        if (staticData) {
+          return staticData
+        }
+      }
+      throw error
     }
-    
-    const url = dateRange ? `/summary?${params.toString()}` : '/summary'
-    const response = await apiInstance.get<SummaryData>(url)
-    return response.data
   },
 
   async getDiseases(): Promise<DiseasesResponse> {
-    const response = await apiInstance.get<DiseasesResponse>('/diseases')
-    return response.data
+    try {
+      const response = await apiInstance.get<DiseasesResponse>('/diseases')
+      return response.data
+    } catch (error: any) {
+      // API接続に失敗した場合、静的データから読み込む
+      if (error.message?.includes('ネットワークエラー') || error.message?.includes('接続できません')) {
+        console.warn('API接続に失敗したため、静的データから読み込みます')
+        const staticList = await loadStaticDiseaseList()
+        if (staticList) {
+          return { diseases: staticList }
+        }
+      }
+      throw error
+    }
   },
 
   async getDiseaseTimeSeries(
@@ -159,8 +184,20 @@ export const apiClient = {
   },
 
   async getSentinelDiseases(): Promise<{ diseases: string[] }> {
-    const response = await apiInstance.get('/sentinel/diseases')
-    return response.data
+    try {
+      const response = await apiInstance.get('/sentinel/diseases')
+      return response.data
+    } catch (error: any) {
+      // API接続に失敗した場合、静的データから読み込む
+      if (error.message?.includes('ネットワークエラー') || error.message?.includes('接続できません')) {
+        console.warn('API接続に失敗したため、静的データから読み込みます')
+        const staticList = await loadStaticSentinelDiseaseList()
+        if (staticList) {
+          return { diseases: staticList }
+        }
+      }
+      throw error
+    }
   },
 
   async getSentinelDiseaseTimeSeries(
