@@ -13,6 +13,9 @@ jobs:
     steps:
     - name: リポジトリをチェックアウト
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
     
     - name: Python環境をセットアップ
       uses: actions/setup-python@v5
@@ -32,13 +35,14 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}/backend
     
-    - name: 変更をコミット
+    - name: 変更をコミットしてプッシュ
       if: github.event_name == 'schedule'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add csv_list/ backend/processed_data/ data/ || true
-        git diff --staged --quiet || (git commit -m "自動データ更新: $(date +'%Y-%m-%d %H:%M:%S')" && git push) || true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if ! git diff --staged --quiet; then
+          git commit -m "自動データ更新: $(date +'%Y-%m-%d %H:%M:%S')"
+          git push
+        fi
 
