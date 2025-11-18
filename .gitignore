@@ -85,3 +85,6 @@ backend/processed_data/*.csv
 
 # Vercel
 .vercel
+
+# TypeScript build info
+tsconfig.tsbuildinfo
