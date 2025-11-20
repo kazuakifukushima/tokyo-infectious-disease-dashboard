@@ -141,15 +141,20 @@ export const apiClient = {
     endYear?: number
   ): Promise<DiseaseTimeSeriesResponse> {
     // Vercel環境では直接静的データを使用
-    const isVercelEnv = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    const isVercelEnv = typeof window !== 'undefined' && 
+                       (window.location.hostname.includes('vercel.app') || 
+                        window.location.hostname.includes('vercel.dev') ||
+                        window.location.hostname !== 'localhost')
     
     if (isVercelEnv) {
-      console.log('[apiClient] Vercel環境を検出、静的データから読み込みます')
+      console.log('[apiClient] Vercel環境を検出、静的データから読み込みます', window.location.hostname)
       try {
         const staticData = await loadStaticDiseaseTimeSeries(diseaseName, startYear, endYear)
-        if (staticData) {
+        if (staticData && staticData.data) {
           console.log('[apiClient] 静的データ読み込み成功:', staticData.data.length, '件')
           return staticData as DiseaseTimeSeriesResponse
+        } else {
+          console.warn('[apiClient] 静的データが空です')
         }
       } catch (staticError) {
         console.error('[apiClient] 静的データの読み込みに失敗:', staticError)
@@ -167,21 +172,27 @@ export const apiClient = {
       )
       return response.data
     } catch (error: any) {
-      // API接続に失敗した場合、静的データから読み込む
+      console.error('[apiClient] API接続エラー:', error)
+      
+      // 404エラーまたはその他のエラーの場合も静的データから読み込む
+      const is404Error = error.response && error.response.status === 404
       const isNetworkError = error.message?.includes('ネットワークエラー') || 
                             error.message?.includes('接続できません') ||
+                            error.message?.includes('API Error') ||
                             error.code === 'ECONNREFUSED' ||
                             error.code === 'ERR_NETWORK' ||
                             (error.response && error.response.status >= 500) ||
                             !error.response
       
-      if (isNetworkError) {
-        console.warn('[apiClient] API接続に失敗したため、静的データから読み込みます', error.message)
+      if (is404Error || isNetworkError) {
+        console.warn('[apiClient] API接続に失敗したため、静的データから読み込みます', error.message || `Status: ${error.response?.status}`)
         try {
           const staticData = await loadStaticDiseaseTimeSeries(diseaseName, startYear, endYear)
-          if (staticData) {
+          if (staticData && staticData.data) {
             console.log('[apiClient] 静的データ読み込み成功（フォールバック）:', staticData.data.length, '件')
             return staticData as DiseaseTimeSeriesResponse
+          } else {
+            console.warn('[apiClient] 静的データが空です（フォールバック）')
           }
         } catch (staticError) {
           console.error('[apiClient] 静的データの読み込みにも失敗しました', staticError)
@@ -287,6 +298,25 @@ export const apiClient = {
     startYear?: number,
     endYear?: number
   ): Promise<DiseaseTimeSeriesResponse> {
+    // Vercel環境では直接静的データを使用
+    const isVercelEnv = typeof window !== 'undefined' && 
+                       (window.location.hostname.includes('vercel.app') || 
+                        window.location.hostname.includes('vercel.dev') ||
+                        window.location.hostname !== 'localhost')
+    
+    if (isVercelEnv) {
+      console.log('[apiClient] Vercel環境を検出、静的データから読み込みます（定点把握）', window.location.hostname)
+      try {
+        const staticData = await loadStaticSentinelDiseaseTimeSeries(diseaseName, startYear, endYear)
+        if (staticData && staticData.data) {
+          console.log('[apiClient] 静的データ読み込み成功（定点把握）:', staticData.data.length, '件')
+          return staticData as DiseaseTimeSeriesResponse
+        }
+      } catch (staticError) {
+        console.error('[apiClient] 静的データの読み込みに失敗（定点把握）:', staticError)
+      }
+    }
+    
     try {
       const params = new URLSearchParams()
       if (startYear !== undefined) params.append('start_year', startYear.toString())
@@ -298,24 +328,28 @@ export const apiClient = {
       )
       return response.data
     } catch (error: any) {
-      // Vercel環境またはAPI接続に失敗した場合、静的データから読み込む
-      const isVercelEnv = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      console.error('[apiClient] API接続エラー（定点把握）:', error)
+      
+      // 404エラーまたはその他のエラーの場合も静的データから読み込む
+      const is404Error = error.response && error.response.status === 404
       const isNetworkError = error.message?.includes('ネットワークエラー') || 
                             error.message?.includes('接続できません') ||
+                            error.message?.includes('API Error') ||
                             error.code === 'ECONNREFUSED' ||
                             error.code === 'ERR_NETWORK' ||
                             (error.response && error.response.status >= 500) ||
                             !error.response
       
-      if (isVercelEnv || isNetworkError) {
-        console.warn('API接続に失敗したため、静的データから読み込みます', error.message)
+      if (is404Error || isNetworkError) {
+        console.warn('[apiClient] API接続に失敗したため、静的データから読み込みます（定点把握）', error.message || `Status: ${error.response?.status}`)
         try {
           const staticData = await loadStaticSentinelDiseaseTimeSeries(diseaseName, startYear, endYear)
-          if (staticData) {
+          if (staticData && staticData.data) {
+            console.log('[apiClient] 静的データ読み込み成功（フォールバック、定点把握）:', staticData.data.length, '件')
             return staticData as DiseaseTimeSeriesResponse
           }
         } catch (staticError) {
-          console.error('静的データの読み込みにも失敗しました', staticError)
+          console.error('[apiClient] 静的データの読み込みにも失敗しました（定点把握）', staticError)
         }
       }
       throw error
