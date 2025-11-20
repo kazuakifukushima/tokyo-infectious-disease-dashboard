@@ -82,6 +82,8 @@ backend/processed_data/*.csv
 # Temporary files
 *.tmp
 *.temp
+*.bak
+*.bak.*
 
 # Vercel
 .vercel
