@@ -30,7 +30,7 @@ interface DiseasesViewProps {
   dateRange: DateRange | null
 }
 
-// 感染症の法定分類定義
+// 感染症の法定分類定義（厚生労働省の感染症法に基づく）
 const DISEASE_CATEGORIES: Record<string, string[]> = {
   "1類感染症": [
     "エボラ出血熱", "クリミア・コンゴ出血熱", "痘そう", "南米出血熱", 
@@ -38,7 +38,8 @@ const DISEASE_CATEGORIES: Record<string, string[]> = {
   ],
   "2類感染症": [
     "急性灰白髄炎", "結核", "ジフテリア", "重症急性呼吸器症候群", 
-    "中東呼吸器症候群", "鳥インフルエンザ（H5N1)", "鳥インフルエンザ（H7N9)"
+    "中東呼吸器症候群", "鳥インフルエンザ（H5N1)", "鳥インフルエンザ（H7N9)",
+    "インフルエンザ（H5N1）"
   ],
   "3類感染症": [
     "コレラ", "細菌性赤痢", "腸チフス", "パラチフス"
@@ -49,11 +50,14 @@ const DISEASE_CATEGORIES: Record<string, string[]> = {
     "回帰熱", "Ｑ熱", "狂犬病", "コクシジオイデス症", "ジカウイルス感染症",
     "重症熱性血小板減少症候群", "腎症候性出血熱", "西部ウマ脳炎", "ダニ媒介脳炎",
     "炭疽", "チクングニア熱", "デング熱", "東部ウマ脳炎",
-    "鳥インフルエンザ（H5N1およびH7N9を除く）", "ニパウイルス感染症", "日本紅斑熱", 
-    "日本脳炎", "ハンタウイルス肺症候群", "Ｂウイルス病", "鼻疽", "ブルセラ症",
-    "ベネズエラウマ脳炎", "ヘンドラウイルス感染症", "発しんチフス", "ボツリヌス症",
-    "マラリア", "野兎病", "ライム病", "リッサウイルス感染症", "リフトバレー熱",
-    "類鼻疽", "レジオネラ症", "レプトスピラ症", "ロッキー山紅斑熱", "黄熱"
+    "鳥インフルエンザ（H5N1およびH7N9を除く）", "鳥インフルエンザ（H5N1を除く）", 
+    "鳥インフルエンザ", 
+    "ニパウイルス感染症", "日本紅斑熱", "日本脳炎", "ハンタウイルス肺症候群", 
+    "Ｂウイルス病", "鼻疽", "ブルセラ症", "ベネズエラウマ脳炎", 
+    "ヘンドラウイルス感染症", "発しんチフス", "ボツリヌス症", "マラリア", 
+    "野兎病", "ライム病", "リッサウイルス感染症", "リフトバレー熱",
+    "類鼻疽", "レジオネラ症", "レプトスピラ症", "ロッキー山紅斑熱", "黄熱",
+    "エムポックス", "キャサヌル森林病"
   ],
   "5類感染症": [
     "アメーバ赤痢", "ウイルス性肝炎（Ｅ型肝炎及びＡ型肝炎を除く。）", 
@@ -64,7 +68,8 @@ const DISEASE_CATEGORIES: Record<string, string[]> = {
     "水痘（入院例に限る）", "先天性風しん症候群", "梅毒", "播種性クリプトコックス症",
     "バンコマイシン耐性腸球菌感染症", "バンコマイシン耐性黄色ブドウ球菌感染症",
     "百日咳", "風しん", "麻しん", "薬剤耐性アシネトバクター感染症", 
-    "腸管出血性大腸菌感染症", "髄膜炎菌性髄膜炎"
+    "腸管出血性大腸菌感染症", "髄膜炎菌性髄膜炎", "破傷風", "乳児ボツリヌス症",
+    "新型コロナウイルス感染症"
   ]
 }
 
@@ -79,6 +84,9 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [aggregationMode, setAggregationMode] = useState<'weekly' | 'monthly' | 'yearly'>('weekly')
+  const [enableYearlyComparison, setEnableYearlyComparison] = useState<boolean>(false)
+  const [selectedYears, setSelectedYears] = useState<number[]>([])
+  const [yearlyData, setYearlyData] = useState<Record<number, DiseaseTimeSeriesResponse>>({})
 
   useEffect(() => {
     const fetchDiseases = async () => {
@@ -100,10 +108,26 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
   }, [])
 
   useEffect(() => {
+    if (dateRange) {
+      setStartYear(dateRange.startYear)
+      setEndYear(dateRange.endYear)
+    } else {
+      // デフォルト値: 過去5年間
+      const currentYear = new Date().getFullYear()
+      setStartYear(currentYear - 5)
+      setEndYear(currentYear)
+    }
+    // 年毎比較が無効化されている場合は選択年をクリア
+    if (!enableYearlyComparison) {
+      setSelectedYears([])
+    }
+  }, [dateRange, enableYearlyComparison])
+
+  useEffect(() => {
     if (selectedDisease) {
       fetchTimeSeriesData()
     }
-  }, [selectedDisease, startYear, endYear, dateRange])
+  }, [selectedDisease, startYear, endYear, dateRange, aggregationMode, enableYearlyComparison, selectedYears])
 
   const fetchTimeSeriesData = async () => {
     if (!selectedDisease) return
@@ -112,11 +136,46 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
       setIsChartLoading(true)
       const effectiveStartYear = dateRange ? dateRange.startYear : startYear
       const effectiveEndYear = dateRange ? dateRange.endYear : endYear
-      const data = await apiClient.getDiseaseTimeSeries(selectedDisease, effectiveStartYear, effectiveEndYear)
-      setTimeSeriesData(data)
+      
+      // 年毎比較モード（週毎集計時のみ、かつ有効化されている場合）
+      if (aggregationMode === 'weekly' && enableYearlyComparison && selectedYears.length > 0) {
+        const yearlyDataMap: Record<number, DiseaseTimeSeriesResponse> = {}
+        
+        // 各年のデータを取得
+        for (const year of selectedYears) {
+          try {
+            const data = await apiClient.getDiseaseTimeSeries(selectedDisease, year, year)
+            if (data && data.data) {
+              yearlyDataMap[year] = data
+            }
+          } catch (err) {
+            console.warn(`${year}年のデータ取得に失敗:`, err)
+          }
+        }
+        
+        setYearlyData(yearlyDataMap)
+        
+        // 全体のデータも取得（後方互換性のため）
+        const data = await apiClient.getDiseaseTimeSeries(selectedDisease, effectiveStartYear, effectiveEndYear)
+        if (data && data.data) {
+          setTimeSeriesData(data)
+        } else {
+          setTimeSeriesData(null)
+        }
+      } else {
+        // 通常モード
+        const data = await apiClient.getDiseaseTimeSeries(selectedDisease, effectiveStartYear, effectiveEndYear)
+        if (data && data.data) {
+          setTimeSeriesData(data)
+        } else {
+          setTimeSeriesData(null)
+        }
+        setYearlyData({})
+      }
     } catch (error) {
       console.error('時系列データ取得エラー:', error)
       setTimeSeriesData(null)
+      setYearlyData({})
     } finally {
       setIsChartLoading(false)
     }
@@ -173,6 +232,73 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
     return result
   }, [diseases, selectedCategory, searchQuery, groupedDiseases])
 
+  // 週番号を計算する関数
+  const getWeekNumber = (date: Date): number => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const dayNum = d.getUTCDay() || 7
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  }
+
+  // 年毎比較用のチャートデータ準備
+  const yearlyComparisonChartData = useMemo(() => {
+    if (aggregationMode !== 'weekly' || !enableYearlyComparison || selectedYears.length === 0 || Object.keys(yearlyData).length === 0) {
+      return null
+    }
+
+    // 週番号（1-52）をX軸に使用
+    const weekLabels = Array.from({ length: 52 }, (_, i) => `第${i + 1}週`)
+    
+    // 各年のデータを週番号で整理
+    const datasets = selectedYears.map((year, index) => {
+      const yearData = yearlyData[year]
+      if (!yearData || !yearData.data) {
+        return null
+      }
+
+      // 週番号をキーにしたマップを作成
+      const weekDataMap: Record<number, number> = {}
+      yearData.data.forEach(item => {
+        const date = new Date(item.date)
+        const week = getWeekNumber(date)
+        weekDataMap[week] = (weekDataMap[week] || 0) + item.value
+      })
+
+      // 週番号順にデータを配列化
+      const data = weekLabels.map((_, weekIndex) => {
+        const week = weekIndex + 1
+        return weekDataMap[week] || 0
+      })
+
+      // 色を生成（各年に異なる色を割り当て）
+      const colors = [
+        { border: 'rgb(59, 130, 246)', background: 'rgba(59, 130, 246, 0.1)' },
+        { border: 'rgb(34, 197, 94)', background: 'rgba(34, 197, 94, 0.1)' },
+        { border: 'rgb(239, 68, 68)', background: 'rgba(239, 68, 68, 0.1)' },
+        { border: 'rgb(251, 146, 60)', background: 'rgba(251, 146, 60, 0.1)' },
+        { border: 'rgb(168, 85, 247)', background: 'rgba(168, 85, 247, 0.1)' },
+        { border: 'rgb(236, 72, 153)', background: 'rgba(236, 72, 153, 0.1)' },
+        { border: 'rgb(14, 165, 233)', background: 'rgba(14, 165, 233, 0.1)' },
+      ]
+      const color = colors[index % colors.length]
+
+      return {
+        label: `${year}年`,
+        data,
+        borderColor: color.border,
+        backgroundColor: color.background,
+        tension: 0.1,
+        fill: false,
+      }
+    }).filter(Boolean) as any[]
+
+    return {
+      labels: weekLabels,
+      datasets,
+    }
+  }, [yearlyData, selectedYears, aggregationMode])
+
   // データを集計する関数
   const aggregateData = useMemo(() => {
     if (!timeSeriesData || !timeSeriesData.data.length) return []
@@ -209,28 +335,41 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [timeSeriesData, aggregationMode])
 
-  const chartData = timeSeriesData && aggregateData.length > 0 ? {
-    labels: aggregateData.map(d => {
-      if (aggregationMode === 'monthly') {
-        const [year, month] = d.date.split('-')
-        return `${year}年${parseInt(month)}月`
-      } else if (aggregationMode === 'yearly') {
-        return `${d.date}年`
-      } else {
-        return new Date(d.date).toLocaleDateString('ja-JP')
-      }
-    }),
-    datasets: [
-      {
-        label: selectedDisease,
-        data: aggregateData.map(d => d.value),
-        borderColor: 'rgba(59, 130, 246, 1)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.1,
-        fill: true,
-      },
-    ],
-  } : { labels: [], datasets: [] }
+  // チャートデータの準備
+  const chartData = useMemo(() => {
+    // 年毎比較モードの場合
+    if (yearlyComparisonChartData) {
+      return yearlyComparisonChartData
+    }
+
+    // 通常モード
+    if (!timeSeriesData || !aggregateData.length) {
+      return { labels: [], datasets: [] }
+    }
+
+    return {
+      labels: aggregateData.map(d => {
+        if (aggregationMode === 'monthly') {
+          const [year, month] = d.date.split('-')
+          return `${year}年${parseInt(month)}月`
+        } else if (aggregationMode === 'yearly') {
+          return `${d.date}年`
+        } else {
+          return new Date(d.date).toLocaleDateString('ja-JP')
+        }
+      }),
+      datasets: [
+        {
+          label: selectedDisease,
+          data: aggregateData.map(d => d.value),
+          borderColor: 'rgba(59, 130, 246, 1)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          tension: 0.1,
+          fill: true,
+        },
+      ],
+    }
+  }, [timeSeriesData, aggregateData, aggregationMode, selectedDisease, yearlyComparisonChartData])
 
   const chartOptions = {
     responsive: true,
@@ -241,7 +380,9 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
       },
       title: {
         display: true,
-        text: `${selectedDisease} の発生動向 (${aggregationMode === 'weekly' ? '週毎' : aggregationMode === 'monthly' ? '月毎' : '年毎'})`,
+        text: aggregationMode === 'weekly' && enableYearlyComparison && selectedYears.length > 1
+          ? `${selectedDisease} の年毎比較（週毎）`
+          : `${selectedDisease} の発生動向（${aggregationMode === 'weekly' ? '週毎' : aggregationMode === 'monthly' ? '月毎' : '年毎'}）`,
       },
     },
     scales: {
@@ -255,7 +396,7 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
       x: {
         title: {
           display: true,
-          text: aggregationMode === 'weekly' ? '報告日' : aggregationMode === 'monthly' ? '年月' : '年',
+          text: aggregationMode === 'weekly' && enableYearlyComparison && selectedYears.length > 1 ? '週番号' : (aggregationMode === 'weekly' ? '報告日' : aggregationMode === 'monthly' ? '年月' : '年'),
         },
       },
     },
@@ -271,26 +412,25 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">疾病別詳細分析</h2>
-        <p className="text-gray-600">個別の感染症について詳細な発生動向を分析できます。</p>
-      </div>
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">疾病別詳細分析</h2>
+        <p className="text-gray-600 mb-6">
+          個別の感染症について詳細な発生動向を分析できます。
+        </p>
 
-      {/* 検索・フィルタセクション */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">分析対象設定</h3>
-        
-        {/* カテゴリ選択と検索 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* 疾病選択と検索 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              カテゴリ
+            </label>
             <select
               value={selectedCategory}
               onChange={(e) => {
                 setSelectedCategory(e.target.value)
                 setSearchQuery('')
               }}
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">すべて</option>
               {Object.keys(groupedDiseases).map(category => (
@@ -300,26 +440,30 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
               ))}
             </select>
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">検索</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              検索
+            </label>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="感染症名で検索..."
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>
 
         {/* 感染症選択 */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">感染症名</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            感染症名
+          </label>
           <select
             value={selectedDisease}
             onChange={(e) => setSelectedDisease(e.target.value)}
-            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             {selectedCategory === 'all' ? (
               // カテゴリ別にグループ化して表示
@@ -348,140 +492,165 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
           )}
         </div>
 
-        {/* 期間選択 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 集約モードと年毎比較 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">開始年</label>
-            <select
-              value={startYear}
-              onChange={(e) => setStartYear(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              {Array.from({ length: 26 }, (_, i) => 2000 + i).map((year) => (
-                <option key={year} value={year}>
-                  {year}年
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">終了年</label>
-            <select
-              value={endYear}
-              onChange={(e) => setEndYear(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              {Array.from({ length: 26 }, (_, i) => 2000 + i).map((year) => (
-                <option key={year} value={year}>
-                  {year}年
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="flex items-end">
-            <button
-              onClick={fetchTimeSeriesData}
-              disabled={isChartLoading}
-              className="w-full px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isChartLoading ? '読み込み中...' : '更新'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 統計サマリー */}
-      {timeSeriesData && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-primary-600">
-              {aggregateData.length}
-            </div>
-            <div className="text-sm text-gray-600">
-              {aggregationMode === 'weekly' ? 'データポイント数' : aggregationMode === 'monthly' ? '月数' : '年数'}
-            </div>
-          </div>
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {aggregateData.reduce((sum, d) => sum + d.value, 0)}
-            </div>
-            <div className="text-sm text-gray-600">期間内総報告数</div>
-          </div>
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-orange-600">
-              {aggregateData.length > 0 ? Math.max(...aggregateData.map(d => d.value)) : 0}
-            </div>
-            <div className="text-sm text-gray-600">
-              {aggregationMode === 'weekly' ? '最大週間報告数' : aggregationMode === 'monthly' ? '最大月間報告数' : '最大年間報告数'}
-            </div>
-          </div>
-          <div className="card text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {aggregateData.length > 0 ? (aggregateData.reduce((sum, d) => sum + d.value, 0) / aggregateData.length).toFixed(1) : 0}
-            </div>
-            <div className="text-sm text-gray-600">
-              {aggregationMode === 'weekly' ? '週平均報告数' : aggregationMode === 'monthly' ? '月平均報告数' : '年平均報告数'}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 時系列グラフ */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            時系列グラフ
-          </h3>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">集計単位:</span>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              集約モード
+            </label>
             <select
               value={aggregationMode}
-              onChange={(e) => setAggregationMode(e.target.value as 'weekly' | 'monthly' | 'yearly')}
-              className="px-3 py-1.5 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              onChange={(e) => {
+                setAggregationMode(e.target.value as 'weekly' | 'monthly' | 'yearly')
+                // 週毎以外の場合は年毎比較を無効化
+                if (e.target.value !== 'weekly') {
+                  setEnableYearlyComparison(false)
+                  setYearlyData({})
+                }
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="weekly">週毎</option>
               <option value="monthly">月毎</option>
               <option value="yearly">年毎</option>
             </select>
           </div>
+
+          {/* 年毎比較トグル（週毎モード時のみ） */}
+          {aggregationMode === 'weekly' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                年毎比較
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableYearlyComparison}
+                  onChange={(e) => {
+                    setEnableYearlyComparison(e.target.checked)
+                    if (!e.target.checked) {
+                      setYearlyData({})
+                      setSelectedYears([])
+                    } else {
+                      // 有効化時にデフォルトで全ての年を選択
+                      const years: number[] = []
+                      for (let year = startYear; year <= endYear; year++) {
+                        years.push(year)
+                      }
+                      setSelectedYears(years)
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-900">年毎比較を有効にする</span>
+              </label>
+            </div>
+          )}
         </div>
-        {isChartLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <LoadingSpinner size="lg" />
-          </div>
-        ) : timeSeriesData && aggregateData.length > 0 ? (
-          <div style={{ height: '400px' }}>
-            <Line data={chartData} options={chartOptions} />
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-64 text-gray-500">
-            データがありません
+
+        {/* 年毎比較設定（週毎モード時のみ、かつ有効化されている場合） */}
+        {aggregationMode === 'weekly' && enableYearlyComparison && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              比較する年を選択（複数選択可）
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i).map((year) => (
+                <label key={year} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedYears.includes(year)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedYears([...selectedYears, year].sort())
+                      } else {
+                        setSelectedYears(selectedYears.filter(y => y !== year))
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-900">{year}年</span>
+                </label>
+              ))}
+            </div>
+            {selectedYears.length === 0 && (
+              <p className="mt-2 text-sm text-yellow-600">少なくとも1つの年を選択してください</p>
+            )}
           </div>
         )}
       </div>
 
-      {/* データテーブル */}
-      {timeSeriesData && aggregateData.length > 0 && (
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            データ詳細 (最新20件)
-          </h3>
+      {/* 統計情報 */}
+      {aggregateData && aggregateData.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-blue-50 rounded-lg p-4">
+            <div className="text-sm text-gray-600">総報告数</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {aggregateData.reduce((sum, d) => sum + d.value, 0).toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-green-50 rounded-lg p-4">
+            <div className="text-sm text-gray-600">最大値</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {Math.max(...aggregateData.map(d => d.value)).toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-yellow-50 rounded-lg p-4">
+            <div className="text-sm text-gray-600">最小値</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {Math.min(...aggregateData.map(d => d.value)).toLocaleString()}
+            </div>
+          </div>
+          <div className="bg-purple-50 rounded-lg p-4">
+            <div className="text-sm text-gray-600">平均値</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {Math.round(aggregateData.reduce((sum, d) => sum + d.value, 0) / aggregateData.length).toLocaleString()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 時系列グラフ */}
+      {isChartLoading ? (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <LoadingSpinner />
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg p-6 border border-gray-200">
+          <div style={{ height: '400px' }}>
+            {chartData.labels.length > 0 ? (
+              <Line data={chartData} options={chartOptions} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                データがありません
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* データ詳細テーブル */}
+      {aggregateData && aggregateData.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">データ詳細</h3>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left py-2 px-4 font-medium text-gray-700">
-                    {aggregationMode === 'weekly' ? '報告日' : aggregationMode === 'monthly' ? '年月' : '年'}
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    {aggregationMode === 'weekly' ? '週' : aggregationMode === 'monthly' ? '月' : '年'}
                   </th>
-                  <th className="text-right py-2 px-4 font-medium text-gray-700">報告数</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                    報告数
+                  </th>
                 </tr>
               </thead>
-              <tbody>
-                {aggregateData.slice(-20).reverse().map((item, index) => (
-                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-2 px-4 text-gray-900">
+              <tbody className="bg-white divide-y divide-gray-200">
+                {aggregateData.map((item, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {aggregationMode === 'monthly' ? (
                         (() => {
                           const [year, month] = item.date.split('-')
@@ -490,10 +659,10 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
                       ) : aggregationMode === 'yearly' ? (
                         `${item.date}年`
                       ) : (
-                        new Date(item.date).toLocaleDateString('ja-JP')
+                        item.date
                       )}
                     </td>
-                    <td className="text-right py-2 px-4 font-mono text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {item.value.toLocaleString()}
                     </td>
                   </tr>

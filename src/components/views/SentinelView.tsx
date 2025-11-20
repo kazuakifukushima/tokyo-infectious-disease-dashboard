@@ -42,6 +42,7 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
   const [aggregationMode, setAggregationMode] = useState<'weekly' | 'monthly' | 'yearly'>('weekly')
   const [summaryData, setSummaryData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [enableYearlyComparison, setEnableYearlyComparison] = useState<boolean>(false)
   const [selectedYears, setSelectedYears] = useState<number[]>([])
   const [yearlyData, setYearlyData] = useState<Record<number, DiseaseTimeSeriesResponse>>({})
 
@@ -71,25 +72,17 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
     if (dateRange) {
       setStartYear(dateRange.startYear)
       setEndYear(dateRange.endYear)
-      // 年毎比較用の選択年を設定
-      const years: number[] = []
-      for (let year = dateRange.startYear; year <= dateRange.endYear; year++) {
-        years.push(year)
-      }
-      setSelectedYears(years.length > 0 ? years : [dateRange.endYear])
     } else {
       // デフォルト値: 過去5年間
       const currentYear = new Date().getFullYear()
       setStartYear(currentYear - 5)
       setEndYear(currentYear)
-      // デフォルトで直近5年を選択
-      const years: number[] = []
-      for (let year = currentYear - 4; year <= currentYear; year++) {
-        years.push(year)
-      }
-      setSelectedYears(years)
     }
-  }, [dateRange])
+    // 年毎比較が無効化されている場合は選択年をクリア
+    if (!enableYearlyComparison) {
+      setSelectedYears([])
+    }
+  }, [dateRange, enableYearlyComparison])
 
   useEffect(() => {
     const fetchTimeSeries = async () => {
@@ -102,8 +95,8 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
       try {
         setIsChartLoading(true)
         
-        // 年毎比較モード（週毎集計時のみ）
-        if (aggregationMode === 'weekly' && selectedYears.length > 0) {
+      // 年毎比較モード（週毎集計時のみ、かつ有効化されている場合）
+      if (aggregationMode === 'weekly' && enableYearlyComparison && selectedYears.length > 0) {
           const yearlyDataMap: Record<number, DiseaseTimeSeriesResponse> = {}
           
           // 各年のデータを取得
@@ -161,7 +154,7 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
     }
 
     fetchTimeSeries()
-  }, [selectedDisease, startYear, endYear, aggregationMode, selectedYears])
+  }, [selectedDisease, startYear, endYear, aggregationMode, enableYearlyComparison, selectedYears])
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -231,7 +224,7 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
 
   // 年毎比較用のチャートデータ準備
   const yearlyComparisonChartData = useMemo(() => {
-    if (aggregationMode !== 'weekly' || selectedYears.length === 0 || Object.keys(yearlyData).length === 0) {
+    if (aggregationMode !== 'weekly' || !enableYearlyComparison || selectedYears.length === 0 || Object.keys(yearlyData).length === 0) {
       return null
     }
 
@@ -345,7 +338,7 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
       },
       title: {
         display: true,
-        text: aggregationMode === 'weekly' && selectedYears.length > 1
+        text: aggregationMode === 'weekly' && enableYearlyComparison && selectedYears.length > 1
           ? `${selectedDisease || '定点把握疾患'} の年毎比較（週毎）`
           : `${selectedDisease || '定点把握疾患'} の発生動向（${aggregationMode === 'weekly' ? '週毎' : aggregationMode === 'monthly' ? '月毎' : '年毎'}）`,
       },
@@ -361,7 +354,7 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
       x: {
         title: {
           display: true,
-          text: aggregationMode === 'weekly' && selectedYears.length > 1 ? '週番号' : (aggregationMode === 'weekly' ? '週' : aggregationMode === 'monthly' ? '月' : '年'),
+          text: aggregationMode === 'weekly' && enableYearlyComparison && selectedYears.length > 1 ? '週番号' : (aggregationMode === 'weekly' ? '週' : aggregationMode === 'monthly' ? '月' : '年'),
         },
       },
     },
@@ -418,19 +411,17 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               定点把握疾患を選択
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="疾病名で検索..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            <input
+              type="text"
+              placeholder="疾病名で検索..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-2"
+            />
             <select
               value={selectedDisease}
               onChange={(e) => setSelectedDisease(e.target.value)}
-              className="mt-2 w-full px-4 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {filteredDiseases.map((disease) => (
                 <option key={disease} value={disease}>
@@ -450,6 +441,7 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
                 setAggregationMode(e.target.value as 'weekly' | 'monthly' | 'yearly')
                 // 週毎以外の場合は年毎比較を無効化
                 if (e.target.value !== 'weekly') {
+                  setEnableYearlyComparison(false)
                   setYearlyData({})
                 }
               }}
@@ -460,13 +452,44 @@ export default function SentinelView({ dateRange }: SentinelViewProps) {
               <option value="yearly">年毎</option>
             </select>
           </div>
+
+          {/* 年毎比較トグル（週毎モード時のみ） */}
+          {aggregationMode === 'weekly' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                年毎比較
+              </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableYearlyComparison}
+                  onChange={(e) => {
+                    setEnableYearlyComparison(e.target.checked)
+                    if (!e.target.checked) {
+                      setYearlyData({})
+                      setSelectedYears([])
+                    } else {
+                      // 有効化時にデフォルトで全ての年を選択
+                      const years: number[] = []
+                      for (let year = startYear; year <= endYear; year++) {
+                        years.push(year)
+                      }
+                      setSelectedYears(years)
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-900">年毎比較を有効にする</span>
+              </label>
+            </div>
+          )}
         </div>
 
-        {/* 年毎比較設定（週毎モード時のみ） */}
-        {aggregationMode === 'weekly' && (
+        {/* 年毎比較設定（週毎モード時のみ、かつ有効化されている場合） */}
+        {aggregationMode === 'weekly' && enableYearlyComparison && (
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              年毎比較（複数選択可）
+              比較する年を選択（複数選択可）
             </label>
             <div className="flex flex-wrap gap-2">
               {Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i).map((year) => (

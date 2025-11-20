@@ -360,6 +360,17 @@ class DataUpdater:
                 processed_data, diseases = process_gender_data(data_dir=self.csv_dir)
                 
                 if processed_data:
+                    # 除外対象の疾病をフィルタリング（全数把握疾患など）
+                    EXCLUDED_DISEASES = {'百日咳'}  # 5類感染症だが全数把握疾患のため除外
+                    filtered_data = [
+                        record for record in processed_data 
+                        if record['disease_name'] not in EXCLUDED_DISEASES
+                    ]
+                    filtered_diseases = [
+                        disease for disease in diseases 
+                        if disease not in EXCLUDED_DISEASES
+                    ]
+                    
                     # データを保存
                     sentinel_output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
                     os.makedirs(sentinel_output_dir, exist_ok=True)
@@ -367,26 +378,26 @@ class DataUpdater:
                     # CSVファイルとして保存
                     sentinel_csv_path = os.path.join(sentinel_output_dir, "sentinel_diseases_data.csv")
                     with open(sentinel_csv_path, 'w', encoding='utf-8', newline='') as f:
-                        if processed_data:
-                            writer = csv.DictWriter(f, fieldnames=processed_data[0].keys())
+                        if filtered_data:
+                            writer = csv.DictWriter(f, fieldnames=filtered_data[0].keys())
                             writer.writeheader()
-                            writer.writerows(processed_data)
+                            writer.writerows(filtered_data)
                     
                     # 疾病リストを保存
                     sentinel_disease_list_path = os.path.join(sentinel_output_dir, "sentinel_disease_list.json")
                     with open(sentinel_disease_list_path, 'w', encoding='utf-8') as f:
-                        json.dump(list(diseases), f, ensure_ascii=False, indent=2)
+                        json.dump(filtered_diseases, f, ensure_ascii=False, indent=2)
                     
                     # サマリー統計を保存
-                    disease_summary = create_disease_summary(processed_data)
+                    disease_summary = create_disease_summary(filtered_data)
                     sentinel_summary_path = os.path.join(sentinel_output_dir, "sentinel_summary_statistics.json")
                     summary_data = {
-                        "total_records": len(processed_data),
-                        "total_diseases": len(diseases),
-                        "available_diseases": list(diseases),
+                        "total_records": len(filtered_data),
+                        "total_diseases": len(filtered_diseases),
+                        "available_diseases": filtered_diseases,
                         "date_range": {
-                            "start_year": min(d['year'] for d in processed_data) if processed_data else None,
-                            "end_year": max(d['year'] for d in processed_data) if processed_data else None
+                            "start_year": min(d['year'] for d in filtered_data) if filtered_data else None,
+                            "end_year": max(d['year'] for d in filtered_data) if filtered_data else None
                         },
                         "disease_statistics": disease_summary
                     }
@@ -394,8 +405,8 @@ class DataUpdater:
                         json.dump(summary_data, f, ensure_ascii=False, indent=2)
                     
                     result["success"] = True
-                    result["processed_files"] = len(processed_data)
-                    logger.info(f"定点把握疾患データ更新が完了しました: {len(processed_data)} レコード")
+                    result["processed_files"] = len(filtered_data)
+                    logger.info(f"定点把握疾患データ更新が完了しました: {len(filtered_data)} レコード（除外: {len(processed_data) - len(filtered_data)} レコード）")
                 else:
                     logger.warning("処理する定点把握疾患データがありませんでした")
                     result["errors"].append("処理するデータがありませんでした")

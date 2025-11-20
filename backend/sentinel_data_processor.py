@@ -116,6 +116,11 @@ def read_sentinel_csv(filepath):
         print(f"Error reading {filepath}: {e}")
         return None, None, {'start_week': None, 'end_week': None, 'is_aggregated': False}
 
+# 定点把握疾患から除外する疾病（全数把握疾患など）
+EXCLUDED_DISEASES = {
+    '百日咳',  # 5類感染症だが全数把握疾患のため除外
+}
+
 def process_gender_data(data_dir: str = '../csv_list'):
     """
     男女別データを処理してインフルエンザなどの主要疾患を抽出
@@ -184,6 +189,10 @@ def process_gender_data(data_dir: str = '../csv_list'):
                 
             disease_name = row[0].strip()
             if not disease_name or disease_name == '疾病名':
+                continue
+            
+            # 除外対象の疾病はスキップ
+            if disease_name in EXCLUDED_DISEASES:
                 continue
                 
             diseases_found.add(disease_name)
