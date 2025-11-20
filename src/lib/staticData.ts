@@ -10,17 +10,25 @@ let cachedDiseaseList: string[] | null = null
 let cachedSentinelDiseaseList: string[] | null = null
 
 /**
- * CSVファイルをパース
+ * CSVファイルをパース（簡易版 - 引用符やエスケープを考慮）
  */
 function parseCSV(csvText: string): any[] {
   const lines = csvText.split('\n').filter(line => line.trim())
   if (lines.length === 0) return []
   
-  const headers = lines[0].split(',').map(h => h.trim())
+  // ヘッダー行をパース
+  const headers = parseCSVLine(lines[0])
+  if (headers.length === 0) return []
+  
   const data = []
   
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim())
+    const values = parseCSVLine(lines[i])
+    if (values.length !== headers.length) {
+      // カラム数が一致しない場合はスキップ
+      continue
+    }
+    
     const row: any = {}
     headers.forEach((header, index) => {
       row[header] = values[index] || ''
@@ -29,6 +37,33 @@ function parseCSV(csvText: string): any[] {
   }
   
   return data
+}
+
+/**
+ * CSV行をパース（カンマ区切り、引用符を考慮）
+ */
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    
+    if (char === '"') {
+      inQuotes = !inQuotes
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  
+  // 最後のフィールドを追加
+  result.push(current.trim())
+  
+  return result
 }
 
 /**
@@ -133,18 +168,25 @@ export async function loadStaticDiseaseTimeSeries(
   endYear?: number
 ): Promise<{ data: Array<{ date: string; value: number }> } | null> {
   try {
+    console.log(`[loadStaticDiseaseTimeSeries] 開始: ${diseaseName}, ${startYear}-${endYear}`)
     const csvData = await loadStaticCSVData('infectious_diseases_data.csv')
     if (!csvData || csvData.length === 0) {
+      console.warn('[loadStaticDiseaseTimeSeries] CSVデータが空です')
       return null
     }
 
+    console.log(`[loadStaticDiseaseTimeSeries] CSVデータ読み込み完了: ${csvData.length}行`)
+    
     // 疾病名でフィルタリング
     const filtered = csvData.filter((row: any) => {
       const rowDiseaseName = row['disease_name']
       return rowDiseaseName === diseaseName
     })
 
+    console.log(`[loadStaticDiseaseTimeSeries] フィルタリング後: ${filtered.length}行`)
+
     if (filtered.length === 0) {
+      console.warn(`[loadStaticDiseaseTimeSeries] 疾病名 "${diseaseName}" のデータが見つかりません`)
       return { data: [] }
     }
 
@@ -163,7 +205,7 @@ export async function loadStaticDiseaseTimeSeries(
         if (startYear && year < startYear) return null
         if (endYear && year > endYear) return null
 
-        const value = parseInt(valueStr, 10)
+        const value = parseInt(String(valueStr), 10)
         if (isNaN(value)) return null
 
         return {
@@ -174,9 +216,10 @@ export async function loadStaticDiseaseTimeSeries(
       .filter((item): item is { date: string; value: number } => item !== null)
       .sort((a, b) => a.date.localeCompare(b.date))
 
+    console.log(`[loadStaticDiseaseTimeSeries] 時系列データ抽出完了: ${timeSeriesData.length}件`)
     return { data: timeSeriesData }
   } catch (error) {
-    console.error('静的時系列データの読み込みエラー:', error)
+    console.error('[loadStaticDiseaseTimeSeries] エラー:', error)
     return null
   }
 }

@@ -143,6 +143,8 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
       const effectiveStartYear = dateRange ? dateRange.startYear : startYear
       const effectiveEndYear = dateRange ? dateRange.endYear : endYear
       
+      console.log(`[DiseasesView] データ取得開始: ${selectedDisease}, ${effectiveStartYear}-${effectiveEndYear}`)
+      
       // 年毎比較モード（週毎集計時のみ、かつ有効化されている場合）
       if (aggregationMode === 'weekly' && enableYearlyComparison && selectedYears.length > 0) {
         const yearlyDataMap: Record<number, DiseaseTimeSeriesResponse> = {}
@@ -151,11 +153,12 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
         for (const year of selectedYears) {
           try {
             const data = await apiClient.getDiseaseTimeSeries(selectedDisease, year, year)
+            console.log(`[DiseasesView] ${year}年のデータ取得:`, data?.data?.length || 0, '件')
             if (data && data.data) {
               yearlyDataMap[year] = data
             }
           } catch (err) {
-            console.warn(`${year}年のデータ取得に失敗:`, err)
+            console.warn(`[DiseasesView] ${year}年のデータ取得に失敗:`, err)
           }
         }
         
@@ -163,6 +166,7 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
         
         // 全体のデータも取得（後方互換性のため）
         const data = await apiClient.getDiseaseTimeSeries(selectedDisease, effectiveStartYear, effectiveEndYear)
+        console.log(`[DiseasesView] 全体データ取得:`, data?.data?.length || 0, '件')
         if (data && data.data) {
           setTimeSeriesData(data)
         } else {
@@ -171,15 +175,17 @@ export default function DiseasesView({ dateRange }: DiseasesViewProps) {
       } else {
         // 通常モード
         const data = await apiClient.getDiseaseTimeSeries(selectedDisease, effectiveStartYear, effectiveEndYear)
+        console.log(`[DiseasesView] 通常モードデータ取得:`, data?.data?.length || 0, '件', data)
         if (data && data.data) {
           setTimeSeriesData(data)
         } else {
+          console.warn(`[DiseasesView] データが空です`)
           setTimeSeriesData(null)
         }
         setYearlyData({})
       }
     } catch (error) {
-      console.error('時系列データ取得エラー:', error)
+      console.error('[DiseasesView] 時系列データ取得エラー:', error)
       setTimeSeriesData(null)
       setYearlyData({})
     } finally {
