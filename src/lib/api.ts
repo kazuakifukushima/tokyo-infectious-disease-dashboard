@@ -43,13 +43,13 @@ const apiInstance = axios.create({
 apiInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
-    console.error('API Error:', error)
+    console.error('[apiInstance] API Error:', error)
     
     // Vercel環境でAPI接続に失敗した場合、静的データファイルから読み込む
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
       // 本番環境でAPI接続エラーの場合、静的ファイルから読み込む
       if (error.request || (error.response && error.response.status >= 500)) {
-        console.warn('API接続に失敗しました。静的データファイルから読み込みます。')
+        console.warn('[apiInstance] API接続に失敗しました。静的データファイルから読み込みます。')
         // エラーを再スローして、呼び出し側で処理できるようにする
       }
     }

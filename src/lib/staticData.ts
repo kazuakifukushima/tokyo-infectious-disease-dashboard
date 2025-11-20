@@ -144,17 +144,23 @@ export async function loadStaticSentinelDiseaseList(): Promise<string[] | null> 
  */
 export async function loadStaticCSVData(filename: string): Promise<any[] | null> {
   try {
-    const response = await fetch(`/data/${filename}`, {
+    const url = `/data/${filename}`
+    console.log(`[loadStaticCSVData] 読み込み開始: ${url}`)
+    const response = await fetch(url, {
       cache: 'no-cache'
     })
+    console.log(`[loadStaticCSVData] レスポンスステータス: ${response.status} ${response.statusText}`)
     if (!response.ok) {
-      console.warn(`静的CSVデータの読み込みに失敗しました: ${filename}`)
+      console.error(`[loadStaticCSVData] 静的CSVデータの読み込みに失敗しました: ${filename} - ${response.status} ${response.statusText}`)
       return null
     }
     const csvText = await response.text()
-    return parseCSV(csvText)
+    console.log(`[loadStaticCSVData] CSVテキスト取得完了: ${csvText.length}文字`)
+    const parsed = parseCSV(csvText)
+    console.log(`[loadStaticCSVData] CSVパース完了: ${parsed.length}行`)
+    return parsed
   } catch (error) {
-    console.error(`静的CSVデータの読み込みエラー: ${filename}`, error)
+    console.error(`[loadStaticCSVData] 静的CSVデータの読み込みエラー: ${filename}`, error)
     return null
   }
 }
