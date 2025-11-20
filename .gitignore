@@ -73,7 +73,11 @@ ENV/
 # Data files (keep structure but ignore large datasets)
 csv_list/*.csv
 csv_list/*.log
+csv_list/*.bak
 backend/processed_data/*.csv
+
+# Note: csv_list/ディレクトリは一時的な保存場所として使用され、
+# GitHubから取得したCSVファイルは直接処理され、保存されません
 
 # Keep important processed files
 !backend/processed_data/summary_statistics.json

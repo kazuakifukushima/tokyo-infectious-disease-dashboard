@@ -41,7 +41,8 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add csv_list/ backend/processed_data/ data/ || true
+        # csv_list/は不要になったため、backend/processed_data/とdata/のみをコミット
+        git add backend/processed_data/ data/ public/data/ || true
         if ! git diff --staged --quiet; then
           git commit -m "自動データ更新: $(date +'%Y-%m-%d %H:%M:%S')" || exit 0
           git push || exit 0

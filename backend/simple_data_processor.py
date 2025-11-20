@@ -100,21 +100,24 @@ class SimpleDataProcessor:
                 return category
         return "その他"
     
-    def process_csv_file(self, filepath):
-        """単一のCSVファイルを処理"""
+    def process_csv_content(self, csv_content: str, filename: str = None):
+        """CSVコンテンツ（文字列）を処理（ファイルパスではなくコンテンツを直接処理）"""
         try:
-            filename = os.path.basename(filepath)
-            date_info = self._extract_date_from_filename(filename)
+            if filename:
+                date_info = self._extract_date_from_filename(filename)
+            else:
+                # ファイル名がない場合は、コンテンツから推測を試みる
+                date_info = None
+            
             if not date_info:
-                logger.warning(f"日付情報を抽出できませんでした: {filename}")
+                logger.warning(f"日付情報を抽出できませんでした: {filename or 'unknown'}")
                 return []
             
             year, week = date_info
             report_date = self._week_to_date(year, week)
             
-            # CSVファイルを読み込み（Shift-JIS エンコーディング）
-            with open(filepath, 'r', encoding='shift_jis') as f:
-                lines = f.readlines()
+            # CSVコンテンツを行に分割
+            lines = csv_content.split('\n')
             
             # 疾病データの開始行を見つける
             data_start = None
@@ -151,6 +154,17 @@ class SimpleDataProcessor:
             
             return disease_data
                 
+        except Exception as e:
+            logger.error(f"CSVコンテンツ処理中にエラーが発生しました {filename or 'unknown'}: {str(e)}")
+            return []
+    
+    def process_csv_file(self, filepath):
+        """単一のCSVファイルを処理（後方互換性のため残す）"""
+        try:
+            filename = os.path.basename(filepath)
+            with open(filepath, 'r', encoding='shift_jis') as f:
+                csv_content = f.read()
+            return self.process_csv_content(csv_content, filename)
         except Exception as e:
             logger.error(f"ファイル処理中にエラーが発生しました {filepath}: {str(e)}")
             return []

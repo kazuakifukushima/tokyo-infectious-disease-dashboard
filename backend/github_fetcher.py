@@ -128,24 +128,39 @@ class GitHubFetcher:
             logger.error(f"定点把握疾患CSVファイル一覧の取得に失敗しました: {str(e)}")
             return []
     
-    def download_file(self, download_url: str, save_path: str) -> bool:
-        """ファイルをダウンロードして保存"""
+    def download_file(self, download_url: str, save_path: str = None) -> Optional[bytes]:
+        """
+        ファイルをダウンロード
+        
+        Args:
+            download_url: ダウンロードURL
+            save_path: 保存先パス（Noneの場合はメモリ上のみ保持）
+        
+        Returns:
+            save_pathが指定された場合: 成功時True、失敗時False
+            save_pathがNoneの場合: ファイルコンテンツ（bytes）、失敗時None
+        """
         try:
             response = requests.get(download_url, timeout=60, stream=True)
             response.raise_for_status()
             
-            # ディレクトリが存在しない場合は作成
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            content = response.content
             
-            with open(save_path, 'wb') as f:
-                shutil.copyfileobj(response.raw, f)
-            
-            logger.info(f"ファイルをダウンロードしました: {save_path}")
-            return True
+            if save_path:
+                # ファイルに保存
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                with open(save_path, 'wb') as f:
+                    f.write(content)
+                logger.info(f"ファイルをダウンロードしました: {save_path}")
+                return True
+            else:
+                # メモリ上のみ保持
+                logger.debug(f"ファイルコンテンツを取得しました: {download_url}")
+                return content
             
         except Exception as e:
             logger.error(f"ファイルのダウンロードに失敗しました {download_url}: {str(e)}")
-            return False
+            return None if save_path is None else False
     
     def get_file_content(self, path: str) -> Optional[str]:
         """ファイルの内容を取得（テキストファイル用）"""

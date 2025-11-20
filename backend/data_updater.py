@@ -42,9 +42,13 @@ class DataUpdater:
         """
         既存データのキーセットを取得（重複チェック用）
         キーは (year, week, disease_name) のタプル
+        
+        注意: このメソッドは統合データファイルから直接読み込むため、
+        csv_list/に個別ファイルがなくても動作する
         """
         existing_keys = set()
         
+        # まず processed_data を確認
         main_data_file = os.path.join(self.output_dir, "infectious_diseases_data.csv")
         if os.path.exists(main_data_file):
             try:
@@ -57,9 +61,27 @@ class DataUpdater:
                             row['disease_name']
                         )
                         existing_keys.add(key)
-                logger.info(f"既存データキー数: {len(existing_keys)}")
+                logger.info(f"既存データキー数（processed_data）: {len(existing_keys)}")
             except Exception as e:
                 logger.error(f"既存データの読み込みエラー: {str(e)}")
+        
+        # 次に data/ ディレクトリも確認（Vercel用の静的ファイル）
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+        data_file = os.path.join(data_dir, "infectious_diseases_data.csv")
+        if os.path.exists(data_file) and data_file != main_data_file:
+            try:
+                with open(data_file, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        key = (
+                            int(row['year']),
+                            int(row['week']),
+                            row['disease_name']
+                        )
+                        existing_keys.add(key)
+                logger.info(f"既存データキー数（data）: {len(existing_keys)}")
+            except Exception as e:
+                logger.error(f"data/ディレクトリのデータ読み込みエラー: {str(e)}")
         
         return existing_keys
     
@@ -142,89 +164,106 @@ class DataUpdater:
         }
         
         try:
-            # 既存のCSVファイルリストを取得
-            existing_csv_files = get_existing_csv_files(self.csv_dir)
-            logger.info(f"既存CSVファイル数: {len(existing_csv_files)}")
-            
-            # GitHubから新しいCSVファイルをダウンロード
-            downloaded_files = []
-            if not force_reprocess:
-                # まず通常の方法を試す
-                try:
-                    downloaded_files = self.github_fetcher.download_new_csv_files(
-                        self.csv_dir,
-                        existing_files=existing_csv_files,
-                        use_recent_only=True
-                    )
-                except Exception as e:
-                    logger.warning(f"通常のダウンロード方法が失敗しました: {str(e)}")
-                    # レート制限の場合は、rawダウンローダーを使用
-                    if RAW_DOWNLOADER_AVAILABLE:
-                        logger.info("rawダウンローダーを使用してファイルを取得します...")
-                        try:
-                            downloaded_files = download_recent_files(
-                                csv_dir=self.csv_dir,
-                                existing_files=existing_csv_files
-                            )
-                        except Exception as e2:
-                            logger.error(f"rawダウンローダーも失敗しました: {str(e2)}")
-                            downloaded_files = []
-                    else:
-                        downloaded_files = []
-                
-                result["downloaded_files"] = len(downloaded_files)
-                
-                # ダウンロードしたファイルがない場合でも、処理を続行（未処理ファイルがある可能性がある）
-                if not downloaded_files:
-                    logger.info("新しいダウンロードファイルはありませんでした。既存ファイルを処理します...")
-            else:
-                logger.info("強制再処理モード: すべてのファイルを処理します")
-            
-            # 既存の処理済みデータを読み込み
+            # 既存の処理済みデータを読み込み（最初に実行）
             existing_data = self.load_existing_data()
             existing_keys = self.get_existing_data_keys()
             logger.info(f"既存データキー数: {len(existing_keys)}")
             
-            # すべてのCSVファイルを処理
-            logger.info("CSVファイルの処理を開始します...")
+            # 既存のCSVファイルリストを取得（後方互換性のため）
+            existing_csv_files = get_existing_csv_files(self.csv_dir)
+            logger.info(f"既存CSVファイル数: {len(existing_csv_files)}")
+            
+            # GitHubから新しいCSVファイルを取得して直接処理（ファイル保存なし）
             all_new_data = []
-            
-            csv_files = [
-                f for f in os.listdir(self.csv_dir)
-                if f.endswith('.csv') and f.startswith('notifiable_weekly_')
-            ]
-            
-            logger.info(f"処理対象ファイル数: {len(csv_files)}")
-            
-            processed_count = 0
-            skipped_count = 0
-            
-            for filename in sorted(csv_files):
-                filepath = os.path.join(self.csv_dir, filename)
+            processed_count_from_github = 0
+            if not force_reprocess:
+                # まず通常の方法を試す
                 try:
-                    file_data = self.data_processor.process_csv_file(filepath)
-                    if file_data:
-                        # 重複チェック: 既存データに含まれていないレコードのみを追加
-                        new_records = []
-                        for record in file_data:
-                            key = (record['year'], record['week'], record['disease_name'])
-                            if key not in existing_keys:
-                                new_records.append(record)
-                                existing_keys.add(key)
+                    csv_files = self.github_fetcher.get_recent_csv_files()
+                    logger.info(f"GitHubから {len(csv_files)} 件のCSVファイル情報を取得しました")
+                    
+                    for file_info in csv_files:
+                        filename = file_info["name"]
+                        # ファイル名から年と週を抽出
+                        date_info = self.data_processor._extract_date_from_filename(filename)
+                        if not date_info:
+                            continue
                         
-                        if new_records:
-                            all_new_data.extend(new_records)
-                            processed_count += 1
-                        else:
-                            skipped_count += 1
-                            
-                        result["processed_files"] += 1
+                        # CSVコンテンツをメモリ上でダウンロード
+                        csv_content_bytes = self.github_fetcher.download_file(file_info["download_url"])
+                        if csv_content_bytes:
+                            try:
+                                # Shift-JISでデコード
+                                csv_content = csv_content_bytes.decode('shift_jis')
+                                # 直接処理
+                                file_data = self.data_processor.process_csv_content(csv_content, filename)
+                                if file_data:
+                                    # 重複チェック: 既存データに含まれていないレコードのみを追加
+                                    new_records = []
+                                    for record in file_data:
+                                        key = (record['year'], record['week'], record['disease_name'])
+                                        if key not in existing_keys:
+                                            new_records.append(record)
+                                            existing_keys.add(key)
+                                    
+                                    if new_records:
+                                        all_new_data.extend(new_records)
+                                        processed_count_from_github += 1
+                                        logger.debug(f"GitHubから処理: {filename} - {len(new_records)} レコード追加")
+                            except Exception as e:
+                                logger.warning(f"CSVコンテンツの処理エラー {filename}: {str(e)}")
+                    
+                    result["downloaded_files"] = processed_count_from_github
+                    logger.info(f"GitHubから {processed_count_from_github} 件のファイルを処理しました")
+                    
                 except Exception as e:
-                    error_msg = f"ファイル処理エラー {filename}: {str(e)}"
-                    logger.error(error_msg)
-                    result["errors"].append(error_msg)
+                    logger.warning(f"GitHubからの直接処理が失敗しました: {str(e)}")
+                    # フォールバック: 既存のcsv_list/から処理
+                    logger.info("既存のcsv_list/から処理を続行します...")
+            else:
+                logger.info("強制再処理モード: 既存ファイルを処理します")
             
-            logger.info(f"処理完了: 新規データあり {processed_count} ファイル, スキップ {skipped_count} ファイル")
+            # 既存のcsv_list/ディレクトリにファイルがある場合のみ処理（後方互換性のため）
+            if os.path.exists(self.csv_dir):
+                csv_files = [
+                    f for f in os.listdir(self.csv_dir)
+                    if f.endswith('.csv') and f.startswith('notifiable_weekly_')
+                ]
+                
+                if csv_files:
+                    logger.info(f"既存のcsv_list/から {len(csv_files)} 件のファイルを処理します...")
+                    
+                    processed_count = 0
+                    skipped_count = 0
+                    
+                    for filename in sorted(csv_files):
+                        filepath = os.path.join(self.csv_dir, filename)
+                        try:
+                            file_data = self.data_processor.process_csv_file(filepath)
+                            if file_data:
+                                # 重複チェック: 既存データに含まれていないレコードのみを追加
+                                new_records = []
+                                for record in file_data:
+                                    key = (record['year'], record['week'], record['disease_name'])
+                                    if key not in existing_keys:
+                                        new_records.append(record)
+                                        existing_keys.add(key)
+                                
+                                if new_records:
+                                    all_new_data.extend(new_records)
+                                    processed_count += 1
+                                else:
+                                    skipped_count += 1
+                                    
+                                result["processed_files"] += 1
+                        except Exception as e:
+                            error_msg = f"ファイル処理エラー {filename}: {str(e)}"
+                            logger.error(error_msg)
+                            result["errors"].append(error_msg)
+                    
+                    logger.info(f"csv_list/処理完了: 新規データあり {processed_count} ファイル, スキップ {skipped_count} ファイル")
+            else:
+                logger.info("csv_list/ディレクトリが存在しないため、スキップします（GitHubから直接処理済み）")
             
             # データを統合
             if existing_data:
