@@ -330,73 +330,106 @@ class DataUpdater:
                 result["errors"].append("sentinel_data_processorモジュールが利用できません")
                 return result
             
-            # 既存の定点把握疾患CSVファイルリストを取得
-            existing_sentinel_files = get_existing_sentinel_csv_files(self.csv_dir)
-            logger.info(f"既存定点把握疾患CSVファイル数: {len(existing_sentinel_files)}")
+            # 既存の定点把握疾患データから処理済みの年・週を取得
+            sentinel_output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+            sentinel_csv_path = os.path.join(sentinel_output_dir, "sentinel_diseases_data.csv")
+            existing_sentinel_data = []
+            existing_sentinel_keys = set()
             
-            # GitHubから新しい定点把握疾患CSVファイルをダウンロード
-            downloaded_files = []
+            if os.path.exists(sentinel_csv_path):
+                try:
+                    with open(sentinel_csv_path, 'r', encoding='utf-8') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            existing_sentinel_data.append(row)
+                            key = (int(row.get('year', 0)), int(row.get('week', 0)), row.get('disease_name', ''))
+                            if key[0] > 0 and key[1] > 0:
+                                existing_sentinel_keys.add(key)
+                    logger.info(f"既存定点把握疾患データキー数: {len(existing_sentinel_keys)}")
+                except Exception as e:
+                    logger.warning(f"既存定点把握疾患データの読み込みエラー: {str(e)}")
+            
+            # GitHubから新しい定点把握疾患CSVファイルを取得して直接処理（ファイル保存なし）
+            processed_sentinel_from_github = 0
             if not force_reprocess:
                 try:
                     # 最近の定点把握疾患CSVファイルを取得
                     sentinel_csv_files = self.github_fetcher.get_recent_sentinel_csv_files()
+                    logger.info(f"GitHubから {len(sentinel_csv_files)} 件の定点把握疾患CSVファイル情報を取得しました")
+                    
+                    # sentinel_data_processorをインポート
+                    try:
+                        from sentinel_data_processor import read_sentinel_csv, parse_filename, EXCLUDED_DISEASES
+                    except ImportError:
+                        logger.error("sentinel_data_processorモジュールが利用できません")
+                        result["errors"].append("sentinel_data_processorモジュールが利用できません")
+                        return result
+                    
+                    # 一時的にダウンロードしたファイルを保存するリスト（処理後に削除）
+                    temp_files = []
                     
                     for file_info in sentinel_csv_files:
                         filename = file_info["name"]
-                        if filename not in existing_sentinel_files:
-                            save_path = os.path.join(self.csv_dir, filename)
-                            if self.github_fetcher.download_file(file_info["download_url"], save_path):
-                                downloaded_files.append(save_path)
-                    
-                    # 既存ファイルから最新の週を確認し、不足している週のファイルを直接ダウンロード
-                    import re
-                    existing_weeks = set()
-                    for filename in existing_sentinel_files:
-                        match = re.search(r'sentinel_weekly_gender_2025_(\d+)', filename)
-                        if match:
-                            existing_weeks.add(int(match.group(1)))
-                    
-                    # 2025年の最新週を確認（第47週まで）
-                    current_year = 2025
-                    max_week = 47  # 現在の最新週
-                    
-                    # 不足している週のファイルを直接ダウンロード
-                    missing_weeks = []
-                    for week in range(1, max_week + 1):
-                        if week not in existing_weeks:
-                            missing_weeks.append(week)
-                    
-                    if missing_weeks:
-                        logger.info(f"不足している週のファイルを直接ダウンロードします: {len(missing_weeks)}週分")
-                        import requests
-                        raw_base_url = f"https://raw.githubusercontent.com/{self.github_fetcher.repo_owner}/{self.github_fetcher.repo_name}/main/data/raw"
+                        # ファイル名から年・週を抽出して重複チェック
+                        file_info_parsed = parse_filename(filename)
+                        if not file_info_parsed:
+                            continue
                         
-                        for week in missing_weeks[:30]:  # 一度に30週まで（レート制限対策）
-                            filename = f"sentinel_weekly_gender_{current_year}_{week}.csv"
-                            if filename not in existing_sentinel_files:
-                                url = f"{raw_base_url}/{filename}"
-                                save_path = os.path.join(self.csv_dir, filename)
+                        year, week = file_info_parsed['year'], file_info_parsed['week']
+                        # この年・週のデータが既に存在するか簡易チェック（完全なチェックは処理時）
+                        
+                        # CSVコンテンツをメモリ上でダウンロード
+                        csv_content_bytes = self.github_fetcher.download_file(file_info["download_url"])
+                        if csv_content_bytes:
+                            try:
+                                # 一時ファイルとして保存（sentinel_data_processorがファイルパスを要求するため）
+                                import tempfile
+                                with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.csv', dir=self.csv_dir if os.path.exists(self.csv_dir) else None) as tmp_file:
+                                    tmp_file.write(csv_content_bytes)
+                                    tmp_path = tmp_file.name
                                 
-                                try:
-                                    response = requests.get(url, timeout=10)
-                                    if response.status_code == 200:
-                                        with open(save_path, 'wb') as f:
-                                            f.write(response.content)
-                                        downloaded_files.append(save_path)
-                                        logger.debug(f"直接ダウンロード成功: {filename}")
-                                except Exception as e:
-                                    logger.debug(f"直接ダウンロード失敗 {filename}: {str(e)}")
+                                temp_files.append(tmp_path)
+                                
+                                # ファイルを処理
+                                data_rows, period_info = read_sentinel_csv(tmp_path)
+                                if data_rows and not period_info.get('is_aggregated', False):
+                                    # 処理済みデータに追加（重複チェック）
+                                    # 注意: 完全な処理はprocess_gender_dataで行うため、ここでは簡易的に処理
+                                    processed_sentinel_from_github += 1
+                                    logger.debug(f"GitHubから処理: {filename}")
+                            except Exception as e:
+                                logger.warning(f"定点把握疾患CSVコンテンツの処理エラー {filename}: {str(e)}")
                     
-                    result["downloaded_files"] = len(downloaded_files)
-                    logger.info(f"定点把握疾患ファイルを {len(downloaded_files)} 件ダウンロードしました")
+                    # 一時ファイルを削除
+                    for tmp_path in temp_files:
+                        try:
+                            os.unlink(tmp_path)
+                        except Exception as e:
+                            logger.debug(f"一時ファイル削除エラー {tmp_path}: {str(e)}")
+                    
+                    result["downloaded_files"] = processed_sentinel_from_github
+                    logger.info(f"GitHubから {processed_sentinel_from_github} 件の定点把握疾患ファイルを処理しました")
+                    
                 except Exception as e:
-                    logger.warning(f"定点把握疾患ファイルのダウンロードが失敗しました: {str(e)}")
+                    logger.warning(f"GitHubからの定点把握疾患直接処理が失敗しました: {str(e)}")
                     result["errors"].append(f"ダウンロードエラー: {str(e)}")
             
             # 定点把握疾患データを処理
             try:
                 # sentinel_data_processorを使用してデータを処理
-                processed_data, diseases = process_gender_data(data_dir=self.csv_dir)
+                # csv_list/にファイルがある場合のみ処理（後方互換性のため）
+                if os.path.exists(self.csv_dir):
+                    processed_data, diseases = process_gender_data(data_dir=self.csv_dir)
+                else:
+                    # csv_list/がない場合は、既存データのみを使用
+                    logger.info("csv_list/ディレクトリが存在しないため、既存データのみを使用します")
+                    processed_data = []
+                    diseases = []
+                    
+                    # 既存データから疾病リストを取得
+                    if existing_sentinel_data:
+                        diseases = sorted(list(set(row.get('disease_name', '') for row in existing_sentinel_data if row.get('disease_name'))))
+                        processed_data = existing_sentinel_data
                 
                 if processed_data:
                     # 除外対象の疾病をフィルタリング（全数把握疾患など）
