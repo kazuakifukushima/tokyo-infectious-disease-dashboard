@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Line, Bar } from 'react-chartjs-2'
+import dynamic from 'next/dynamic'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -16,6 +16,16 @@ import {
 import { apiClient } from '@/lib/api'
 import LoadingSpinner from '../LoadingSpinner'
 import type { YearlyTrendsResponse, TopDiseasesResponse, DateRange } from '@/types'
+
+// Chart.jsをクライアントサイドでのみ読み込む
+const Line = dynamic(() => import('react-chartjs-2').then((mod) => mod.Line), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-64"><LoadingSpinner /></div>
+})
+const Bar = dynamic(() => import('react-chartjs-2').then((mod) => mod.Bar), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-64"><LoadingSpinner /></div>
+})
 
 ChartJS.register(
   CategoryScale,
