@@ -140,6 +140,22 @@ export const apiClient = {
     startYear?: number,
     endYear?: number
   ): Promise<DiseaseTimeSeriesResponse> {
+    // Vercel環境では直接静的データを使用
+    const isVercelEnv = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    
+    if (isVercelEnv) {
+      console.log('[apiClient] Vercel環境を検出、静的データから読み込みます')
+      try {
+        const staticData = await loadStaticDiseaseTimeSeries(diseaseName, startYear, endYear)
+        if (staticData) {
+          console.log('[apiClient] 静的データ読み込み成功:', staticData.data.length, '件')
+          return staticData as DiseaseTimeSeriesResponse
+        }
+      } catch (staticError) {
+        console.error('[apiClient] 静的データの読み込みに失敗:', staticError)
+      }
+    }
+    
     try {
       const params = new URLSearchParams()
       if (startYear) params.append('start_year', startYear.toString())
@@ -151,8 +167,7 @@ export const apiClient = {
       )
       return response.data
     } catch (error: any) {
-      // Vercel環境またはAPI接続に失敗した場合、静的データから読み込む
-      const isVercelEnv = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      // API接続に失敗した場合、静的データから読み込む
       const isNetworkError = error.message?.includes('ネットワークエラー') || 
                             error.message?.includes('接続できません') ||
                             error.code === 'ECONNREFUSED' ||
@@ -160,15 +175,16 @@ export const apiClient = {
                             (error.response && error.response.status >= 500) ||
                             !error.response
       
-      if (isVercelEnv || isNetworkError) {
-        console.warn('API接続に失敗したため、静的データから読み込みます', error.message)
+      if (isNetworkError) {
+        console.warn('[apiClient] API接続に失敗したため、静的データから読み込みます', error.message)
         try {
           const staticData = await loadStaticDiseaseTimeSeries(diseaseName, startYear, endYear)
           if (staticData) {
+            console.log('[apiClient] 静的データ読み込み成功（フォールバック）:', staticData.data.length, '件')
             return staticData as DiseaseTimeSeriesResponse
           }
         } catch (staticError) {
-          console.error('静的データの読み込みにも失敗しました', staticError)
+          console.error('[apiClient] 静的データの読み込みにも失敗しました', staticError)
         }
       }
       throw error
