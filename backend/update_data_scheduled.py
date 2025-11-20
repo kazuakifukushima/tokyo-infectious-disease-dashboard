@@ -51,11 +51,25 @@ def main():
         logger.info("=" * 60)
         
         # 結果に基づいて終了コードを設定
-        if result.get("success"):
+        # 警告: エラーがあっても処理は続行（定点把握疾患のエラーは許容）
+        has_critical_errors = False
+        for error in result.get("errors", []):
+            # 定点把握疾患のダウンロードエラーや軽微なエラーは許容
+            if "定点把握疾患" not in error and "ダウンロードエラー" not in error:
+                has_critical_errors = True
+                break
+        
+        if result.get("success") and not has_critical_errors:
+            logger.info("データ更新が正常に完了しました")
             sys.exit(0)
-        else:
-            logger.error("データ更新に失敗しました")
+        elif has_critical_errors:
+            logger.error("データ更新に重大なエラーが発生しました")
             sys.exit(1)
+        else:
+            # 軽微なエラー（定点把握疾患のダウンロードエラーなど）は警告として扱う
+            logger.warning("データ更新は完了しましたが、一部の処理でエラーが発生しました")
+            logger.warning(f"エラー詳細: {result.get('errors', [])}")
+            sys.exit(0)  # 成功として扱う
             
     except Exception as e:
         logger.error(f"予期しないエラーが発生しました: {str(e)}", exc_info=True)
