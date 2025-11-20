@@ -109,7 +109,9 @@ export async function loadStaticSentinelDiseaseList(): Promise<string[] | null> 
  */
 export async function loadStaticCSVData(filename: string): Promise<any[] | null> {
   try {
-    const response = await fetch(`/data/${filename}`)
+    const response = await fetch(`/data/${filename}`, {
+      cache: 'no-cache'
+    })
     if (!response.ok) {
       console.warn(`静的CSVデータの読み込みに失敗しました: ${filename}`)
       return null
@@ -118,6 +120,120 @@ export async function loadStaticCSVData(filename: string): Promise<any[] | null>
     return parseCSV(csvText)
   } catch (error) {
     console.error(`静的CSVデータの読み込みエラー: ${filename}`, error)
+    return null
+  }
+}
+
+/**
+ * 静的CSVデータから特定の疾病の時系列データを抽出
+ */
+export async function loadStaticDiseaseTimeSeries(
+  diseaseName: string,
+  startYear?: number,
+  endYear?: number
+): Promise<{ data: Array<{ date: string; value: number }> } | null> {
+  try {
+    const csvData = await loadStaticCSVData('infectious_diseases_data.csv')
+    if (!csvData || csvData.length === 0) {
+      return null
+    }
+
+    // 疾病名でフィルタリング
+    const filtered = csvData.filter((row: any) => {
+      const rowDiseaseName = row['disease_name']
+      return rowDiseaseName === diseaseName
+    })
+
+    if (filtered.length === 0) {
+      return { data: [] }
+    }
+
+    // 日付と値を抽出
+    const timeSeriesData = filtered
+      .map((row: any) => {
+        const dateStr = row['report_date']
+        const valueStr = row['count']
+        const year = parseInt(row['year'], 10)
+        
+        if (!dateStr || valueStr === undefined || valueStr === null || isNaN(year)) {
+          return null
+        }
+
+        // 年でフィルタリング
+        if (startYear && year < startYear) return null
+        if (endYear && year > endYear) return null
+
+        const value = parseInt(valueStr, 10)
+        if (isNaN(value)) return null
+
+        return {
+          date: dateStr,
+          value: value
+        }
+      })
+      .filter((item): item is { date: string; value: number } => item !== null)
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+    return { data: timeSeriesData }
+  } catch (error) {
+    console.error('静的時系列データの読み込みエラー:', error)
+    return null
+  }
+}
+
+/**
+ * 静的CSVデータから特定の定点把握疾患の時系列データを抽出
+ */
+export async function loadStaticSentinelDiseaseTimeSeries(
+  diseaseName: string,
+  startYear?: number,
+  endYear?: number
+): Promise<{ data: Array<{ date: string; value: number }> } | null> {
+  try {
+    const csvData = await loadStaticCSVData('sentinel_diseases_data.csv')
+    if (!csvData || csvData.length === 0) {
+      return null
+    }
+
+    // 疾病名でフィルタリング
+    const filtered = csvData.filter((row: any) => {
+      const rowDiseaseName = row['disease_name']
+      return rowDiseaseName === diseaseName
+    })
+
+    if (filtered.length === 0) {
+      return { data: [] }
+    }
+
+    // 日付と値を抽出
+    const timeSeriesData = filtered
+      .map((row: any) => {
+        const dateStr = row['week_date'] || row['week']
+        const valueStr = row['total_count']
+        const year = parseInt(row['year'], 10)
+        
+        if (!dateStr || valueStr === undefined || valueStr === null || isNaN(year)) {
+          return null
+        }
+
+        // 年でフィルタリング
+        if (startYear && year < startYear) return null
+        if (endYear && year > endYear) return null
+
+        const value = parseInt(valueStr, 10)
+        if (isNaN(value)) return null
+
+        return {
+          date: dateStr,
+          value: value
+        }
+      })
+      .filter((item): item is { date: string; value: number } => item !== null)
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+    return { data: timeSeriesData }
+  } catch (error) {
+    console.error('静的定点把握疾患時系列データの読み込みエラー:', error)
     return null
   }
 }

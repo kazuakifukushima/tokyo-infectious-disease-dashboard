@@ -9,7 +9,13 @@ import type {
   DiseasesResponse,
   DateRange
 } from '@/types'
-import { loadStaticSummaryData, loadStaticDiseaseList, loadStaticSentinelDiseaseList } from './staticData'
+import { 
+  loadStaticSummaryData, 
+  loadStaticDiseaseList, 
+  loadStaticSentinelDiseaseList,
+  loadStaticDiseaseTimeSeries,
+  loadStaticSentinelDiseaseTimeSeries
+} from './staticData'
 
 // 本番環境では /api 経由でアクセス、開発環境では localhost:8000 を使用
 const getApiBaseUrl = () => {
@@ -134,15 +140,39 @@ export const apiClient = {
     startYear?: number,
     endYear?: number
   ): Promise<DiseaseTimeSeriesResponse> {
-    const params = new URLSearchParams()
-    if (startYear) params.append('start_year', startYear.toString())
-    if (endYear) params.append('end_year', endYear.toString())
-    
-    const url = `/diseases/${encodeURIComponent(diseaseName)}/timeseries`
-    const response = await apiInstance.get<DiseaseTimeSeriesResponse>(
-      `${url}?${params.toString()}`
-    )
-    return response.data
+    try {
+      const params = new URLSearchParams()
+      if (startYear) params.append('start_year', startYear.toString())
+      if (endYear) params.append('end_year', endYear.toString())
+      
+      const url = `/diseases/${encodeURIComponent(diseaseName)}/timeseries`
+      const response = await apiInstance.get<DiseaseTimeSeriesResponse>(
+        `${url}?${params.toString()}`
+      )
+      return response.data
+    } catch (error: any) {
+      // Vercel環境またはAPI接続に失敗した場合、静的データから読み込む
+      const isVercelEnv = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      const isNetworkError = error.message?.includes('ネットワークエラー') || 
+                            error.message?.includes('接続できません') ||
+                            error.code === 'ECONNREFUSED' ||
+                            error.code === 'ERR_NETWORK' ||
+                            (error.response && error.response.status >= 500) ||
+                            !error.response
+      
+      if (isVercelEnv || isNetworkError) {
+        console.warn('API接続に失敗したため、静的データから読み込みます', error.message)
+        try {
+          const staticData = await loadStaticDiseaseTimeSeries(diseaseName, startYear, endYear)
+          if (staticData) {
+            return staticData as DiseaseTimeSeriesResponse
+          }
+        } catch (staticError) {
+          console.error('静的データの読み込みにも失敗しました', staticError)
+        }
+      }
+      throw error
+    }
   },
 
   async getTopDiseases(
@@ -241,15 +271,39 @@ export const apiClient = {
     startYear?: number,
     endYear?: number
   ): Promise<DiseaseTimeSeriesResponse> {
-    const params = new URLSearchParams()
-    if (startYear !== undefined) params.append('start_year', startYear.toString())
-    if (endYear !== undefined) params.append('end_year', endYear.toString())
-    
-    const url = `/sentinel/diseases/${encodeURIComponent(diseaseName)}/timeseries`
-    const response = await apiInstance.get<DiseaseTimeSeriesResponse>(
-      `${url}?${params.toString()}`
-    )
-    return response.data
+    try {
+      const params = new URLSearchParams()
+      if (startYear !== undefined) params.append('start_year', startYear.toString())
+      if (endYear !== undefined) params.append('end_year', endYear.toString())
+      
+      const url = `/sentinel/diseases/${encodeURIComponent(diseaseName)}/timeseries`
+      const response = await apiInstance.get<DiseaseTimeSeriesResponse>(
+        `${url}?${params.toString()}`
+      )
+      return response.data
+    } catch (error: any) {
+      // Vercel環境またはAPI接続に失敗した場合、静的データから読み込む
+      const isVercelEnv = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      const isNetworkError = error.message?.includes('ネットワークエラー') || 
+                            error.message?.includes('接続できません') ||
+                            error.code === 'ECONNREFUSED' ||
+                            error.code === 'ERR_NETWORK' ||
+                            (error.response && error.response.status >= 500) ||
+                            !error.response
+      
+      if (isVercelEnv || isNetworkError) {
+        console.warn('API接続に失敗したため、静的データから読み込みます', error.message)
+        try {
+          const staticData = await loadStaticSentinelDiseaseTimeSeries(diseaseName, startYear, endYear)
+          if (staticData) {
+            return staticData as DiseaseTimeSeriesResponse
+          }
+        } catch (staticError) {
+          console.error('静的データの読み込みにも失敗しました', staticError)
+        }
+      }
+      throw error
+    }
   },
 
   async getSentinelTopDiseases(
