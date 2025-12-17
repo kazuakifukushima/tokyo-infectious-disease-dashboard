@@ -259,6 +259,33 @@ class SimpleDataProcessor:
             json.dump(disease_list, f, ensure_ascii=False, indent=2)
         logger.info(f"疾病リストを保存しました: {disease_file}")
         
+        # data/ディレクトリにも保存（GitHub Actions環境用）
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+        os.makedirs(data_dir, exist_ok=True)
+        
+        data_main_file = os.path.join(data_dir, 'infectious_diseases_data.csv')
+        data_summary_file = os.path.join(data_dir, 'summary_statistics.json')
+        data_disease_file = os.path.join(data_dir, 'disease_list.json')
+        
+        import shutil
+        shutil.copy2(main_file, data_main_file)
+        shutil.copy2(summary_file, data_summary_file)
+        shutil.copy2(disease_file, data_disease_file)
+        logger.info(f"data/ディレクトリにもデータをコピーしました")
+        
+        # public/data/ディレクトリにもコピー（Vercel用）
+        public_data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "public", "data")
+        os.makedirs(public_data_dir, exist_ok=True)
+        
+        public_main_file = os.path.join(public_data_dir, 'infectious_diseases_data.csv')
+        public_summary_file = os.path.join(public_data_dir, 'summary_statistics.json')
+        public_disease_file = os.path.join(public_data_dir, 'disease_list.json')
+        
+        shutil.copy2(main_file, public_main_file)
+        shutil.copy2(summary_file, public_summary_file)
+        shutil.copy2(disease_file, public_disease_file)
+        logger.info(f"public/data/ディレクトリにもデータをコピーしました")
+        
         logger.info("データ処理が完了しました")
 
 def main():

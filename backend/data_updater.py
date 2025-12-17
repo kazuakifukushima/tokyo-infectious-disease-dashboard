@@ -563,6 +563,20 @@ class DataUpdater:
                     with open(sentinel_summary_path, 'w', encoding='utf-8') as f:
                         json.dump(summary_data, f, ensure_ascii=False, indent=2)
                     
+                    # public/data/ディレクトリにもコピー（Vercel用）
+                    import shutil
+                    public_data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "public", "data")
+                    os.makedirs(public_data_dir, exist_ok=True)
+                    
+                    public_sentinel_csv = os.path.join(public_data_dir, "sentinel_diseases_data.csv")
+                    public_sentinel_list = os.path.join(public_data_dir, "sentinel_disease_list.json")
+                    public_sentinel_summary = os.path.join(public_data_dir, "sentinel_summary_statistics.json")
+                    
+                    shutil.copy2(sentinel_csv_path, public_sentinel_csv)
+                    shutil.copy2(sentinel_disease_list_path, public_sentinel_list)
+                    shutil.copy2(sentinel_summary_path, public_sentinel_summary)
+                    logger.info(f"public/data/ディレクトリにもデータをコピーしました")
+                    
                     result["success"] = True
                     result["processed_files"] = int(len(filtered_data))
                     logger.info(f"定点把握疾患データ更新が完了しました: {len(filtered_data)} レコード（除外: {len(processed_data) - len(filtered_data)} レコード）")
