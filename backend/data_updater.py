@@ -119,9 +119,10 @@ class DataUpdater:
         return merged_data
     
     def load_existing_data(self) -> List[Dict]:
-        """既存の処理済みデータを読み込み"""
+        """既存の処理済みデータを読み込み（processed_data/とdata/の両方を確認）"""
         existing_data = []
         
+        # まず processed_data を確認
         main_data_file = os.path.join(self.output_dir, "infectious_diseases_data.csv")
         if os.path.exists(main_data_file):
             try:
@@ -136,9 +137,32 @@ class DataUpdater:
                             'report_date': row['report_date'],
                             'category': row['category']
                         })
-                logger.info(f"既存データを読み込みました: {len(existing_data)} レコード")
+                logger.info(f"既存データを読み込みました（processed_data）: {len(existing_data)} レコード")
             except Exception as e:
-                logger.error(f"既存データの読み込みエラー: {str(e)}")
+                logger.error(f"既存データの読み込みエラー（processed_data）: {str(e)}")
+        
+        # 次に data/ ディレクトリも確認（Vercel用の静的ファイル、GitHub Actions環境）
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+        data_file = os.path.join(data_dir, "infectious_diseases_data.csv")
+        if os.path.exists(data_file) and data_file != main_data_file:
+            try:
+                with open(data_file, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        # 重複チェック: 既に読み込んだデータと重複していないか確認
+                        key = (int(row['year']), int(row['week']), row['disease_name'])
+                        if not any((d['year'], d['week'], d['disease_name']) == key for d in existing_data):
+                            existing_data.append({
+                                'disease_name': row['disease_name'],
+                                'count': int(row['count']),
+                                'year': int(row['year']),
+                                'week': int(row['week']),
+                                'report_date': row['report_date'],
+                                'category': row['category']
+                            })
+                logger.info(f"既存データを読み込みました（data）: 合計 {len(existing_data)} レコード")
+            except Exception as e:
+                logger.error(f"data/ディレクトリのデータ読み込みエラー: {str(e)}")
         
         return existing_data
     
@@ -269,17 +293,26 @@ class DataUpdater:
             if existing_data:
                 merged_data = existing_data + all_new_data
                 result["new_records"] = len(all_new_data)
+                logger.info(f"既存データ {len(existing_data)} レコード + 新規データ {len(all_new_data)} レコード")
             else:
                 merged_data = all_new_data
                 result["new_records"] = len(merged_data)
+                if merged_data:
+                    logger.info(f"既存データなし、新規データ {len(merged_data)} レコード")
             
             result["total_records"] = len(merged_data)
             
-            # 処理済みデータを保存
+            # 処理済みデータを保存（既存データがあれば統合データを、なければ新規データを保存）
             if merged_data:
                 self.data_processor.save_processed_data(merged_data)
                 result["success"] = True
                 logger.info(f"データ更新が完了しました: 新規 {result['new_records']} レコード, 総計 {result['total_records']} レコード")
+            elif existing_data:
+                # 既存データのみがある場合も保存（データが更新されていない場合）
+                self.data_processor.save_processed_data(existing_data)
+                result["success"] = True
+                result["total_records"] = len(existing_data)
+                logger.info(f"既存データを保存しました: {len(existing_data)} レコード（新規データなし）")
             else:
                 logger.warning("保存するデータがありませんでした")
                 result["errors"].append("保存するデータがありませんでした")
@@ -341,8 +374,20 @@ class DataUpdater:
                     with open(sentinel_csv_path, 'r', encoding='utf-8') as f:
                         reader = csv.DictReader(f)
                         for row in reader:
-                            existing_sentinel_data.append(row)
-                            key = (int(row.get('year', 0)), int(row.get('week', 0)), row.get('disease_name', ''))
+                            # 型変換を確実に行う
+                            normalized_row = {
+                                'disease_name': str(row.get('disease_name', '')),
+                                'year': int(row.get('year', 0)),
+                                'week': int(row.get('week', 0)),
+                                'week_date': str(row.get('week_date', '')),
+                                'male_count': int(row.get('male_count', 0)),
+                                'female_count': int(row.get('female_count', 0)),
+                                'total_count': int(row.get('total_count', 0)),
+                                'sentinel_points': int(row.get('sentinel_points', 0)),
+                                'data_type': str(row.get('data_type', 'gender'))
+                            }
+                            existing_sentinel_data.append(normalized_row)
+                            key = (normalized_row['year'], normalized_row['week'], normalized_row['disease_name'])
                             if key[0] > 0 and key[1] > 0:
                                 existing_sentinel_keys.add(key)
                     logger.info(f"既存定点把握疾患データキー数: {len(existing_sentinel_keys)}")
@@ -351,10 +396,11 @@ class DataUpdater:
             
             # GitHubから新しい定点把握疾患CSVファイルを取得して直接処理（ファイル保存なし）
             processed_sentinel_from_github = 0
+            new_sentinel_data = []
             if not force_reprocess:
                 try:
-                    # 最近の定点把握疾患CSVファイルを取得
-                    sentinel_csv_files = self.github_fetcher.get_recent_sentinel_csv_files()
+                    # 最近の定点把握疾患CSVファイルを取得（raw URL優先）
+                    sentinel_csv_files = self.github_fetcher.get_recent_sentinel_csv_files(max_files=200)
                     logger.info(f"GitHubから {len(sentinel_csv_files)} 件の定点把握疾患CSVファイル情報を取得しました")
                     
                     # sentinel_data_processorをインポート
@@ -376,7 +422,12 @@ class DataUpdater:
                             continue
                         
                         year, week = file_info_parsed['year'], file_info_parsed['week']
-                        # この年・週のデータが既に存在するか簡易チェック（完全なチェックは処理時）
+                        
+                        # 重複チェック: 既存データに含まれているか確認
+                        key = (year, week)
+                        if any((int(d.get('year', 0)), int(d.get('week', 0))) == key for d in existing_sentinel_data):
+                            logger.debug(f"既存データのためスキップ: {filename} ({year}-W{week:02d})")
+                            continue
                         
                         # CSVコンテンツをメモリ上でダウンロード
                         csv_content_bytes = self.github_fetcher.download_file(file_info["download_url"])
@@ -391,12 +442,35 @@ class DataUpdater:
                                 temp_files.append(tmp_path)
                                 
                                 # ファイルを処理
-                                data_rows, period_info = read_sentinel_csv(tmp_path)
+                                headers, data_rows, period_info = read_sentinel_csv(tmp_path)
                                 if data_rows and not period_info.get('is_aggregated', False):
-                                    # 処理済みデータに追加（重複チェック）
-                                    # 注意: 完全な処理はprocess_gender_dataで行うため、ここでは簡易的に処理
+                                    # データを処理済み形式に変換
+                                    for row in data_rows:
+                                        if len(row) >= 4:
+                                            disease_name = row[0].strip()
+                                            if disease_name and disease_name not in EXCLUDED_DISEASES:
+                                                try:
+                                                    male_count = int(row[1] or 0)
+                                                    female_count = int(row[2] or 0)
+                                                    total_count = int(row[3] or 0)
+                                                    sentinel_points = int(row[4] or 0) if len(row) > 4 else 0
+                                                    
+                                                    new_sentinel_data.append({
+                                                        'disease_name': disease_name,
+                                                        'year': year,
+                                                        'week': week,
+                                                        'week_date': f"{year}-W{week:02d}",
+                                                        'male_count': male_count,
+                                                        'female_count': female_count,
+                                                        'total_count': total_count,
+                                                        'sentinel_points': sentinel_points,
+                                                        'data_type': 'gender'
+                                                    })
+                                                except (ValueError, IndexError):
+                                                    continue
+                                    
                                     processed_sentinel_from_github += 1
-                                    logger.debug(f"GitHubから処理: {filename}")
+                                    logger.info(f"GitHubから処理: {filename} ({year}-W{week:02d}) - {len(data_rows)} レコード")
                             except Exception as e:
                                 logger.warning(f"定点把握疾患CSVコンテンツの処理エラー {filename}: {str(e)}")
                     
@@ -408,7 +482,7 @@ class DataUpdater:
                             logger.debug(f"一時ファイル削除エラー {tmp_path}: {str(e)}")
                     
                     result["downloaded_files"] = processed_sentinel_from_github
-                    logger.info(f"GitHubから {processed_sentinel_from_github} 件の定点把握疾患ファイルを処理しました")
+                    logger.info(f"GitHubから {processed_sentinel_from_github} 件の定点把握疾患ファイルを処理しました（新規データ: {len(new_sentinel_data)} レコード）")
                     
                 except Exception as e:
                     logger.warning(f"GitHubからの定点把握疾患直接処理が失敗しました: {str(e)}")
@@ -416,20 +490,33 @@ class DataUpdater:
             
             # 定点把握疾患データを処理
             try:
+                # 新規データと既存データを統合
+                all_sentinel_data = existing_sentinel_data + new_sentinel_data
+                
                 # sentinel_data_processorを使用してデータを処理
                 # csv_list/にファイルがある場合のみ処理（後方互換性のため）
                 if os.path.exists(self.csv_dir):
-                    processed_data, diseases = process_gender_data(data_dir=self.csv_dir)
+                    try:
+                        csv_processed_data, diseases = process_gender_data(data_dir=self.csv_dir)
+                        # CSVから処理したデータも統合（重複チェック）
+                        if isinstance(csv_processed_data, list):
+                            csv_keys = {(int(d.get('year', 0)), int(d.get('week', 0)), str(d.get('disease_name', ''))) for d in all_sentinel_data}
+                            for record in csv_processed_data:
+                                if isinstance(record, dict):
+                                    key = (int(record.get('year', 0)), int(record.get('week', 0)), str(record.get('disease_name', '')))
+                                    if key not in csv_keys:
+                                        all_sentinel_data.append(record)
+                                        csv_keys.add(key)
+                        processed_data = all_sentinel_data
+                    except Exception as e:
+                        logger.warning(f"csv_list/からの処理でエラーが発生しました: {str(e)}")
+                        processed_data = all_sentinel_data
+                        diseases = sorted(list(set(str(row.get('disease_name', '')) for row in processed_data if row.get('disease_name'))))
                 else:
-                    # csv_list/がない場合は、既存データのみを使用
-                    logger.info("csv_list/ディレクトリが存在しないため、既存データのみを使用します")
-                    processed_data = []
-                    diseases = []
-                    
-                    # 既存データから疾病リストを取得
-                    if existing_sentinel_data:
-                        diseases = sorted(list(set(row.get('disease_name', '') for row in existing_sentinel_data if row.get('disease_name'))))
-                        processed_data = existing_sentinel_data
+                    # csv_list/がない場合は、既存データと新規データを使用
+                    logger.info("csv_list/ディレクトリが存在しないため、既存データと新規データを使用します")
+                    processed_data = all_sentinel_data
+                    diseases = sorted(list(set(str(row.get('disease_name', '')) for row in processed_data if row.get('disease_name'))))
                 
                 if processed_data:
                     # 除外対象の疾病をフィルタリング（全数把握疾患など）
@@ -468,8 +555,8 @@ class DataUpdater:
                         "total_diseases": len(filtered_diseases),
                         "available_diseases": filtered_diseases,
                         "date_range": {
-                            "start_year": min(d['year'] for d in filtered_data) if filtered_data else None,
-                            "end_year": max(d['year'] for d in filtered_data) if filtered_data else None
+                            "start_year": min(int(d['year']) if isinstance(d.get('year'), str) else d.get('year', 0) for d in filtered_data) if filtered_data else None,
+                            "end_year": max(int(d['year']) if isinstance(d.get('year'), str) else d.get('year', 0) for d in filtered_data) if filtered_data else None
                         },
                         "disease_statistics": disease_summary
                     }
@@ -477,7 +564,7 @@ class DataUpdater:
                         json.dump(summary_data, f, ensure_ascii=False, indent=2)
                     
                     result["success"] = True
-                    result["processed_files"] = len(filtered_data)
+                    result["processed_files"] = int(len(filtered_data))
                     logger.info(f"定点把握疾患データ更新が完了しました: {len(filtered_data)} レコード（除外: {len(processed_data) - len(filtered_data)} レコード）")
                 else:
                     logger.warning("処理する定点把握疾患データがありませんでした")

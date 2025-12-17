@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 GitHubリポジトリからCSVファイルを取得するモジュール
-https://github.com/kambarakun/fetch-tokyo-idsc-github-actions からデータを取得
+https://github.com/kambarakun/fetch-tokyo-idsc からデータを取得
+レート制限回避のため、raw URLから直接取得する方式も実装
 """
 
 import os
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 class GitHubFetcher:
     """GitHubリポジトリからCSVファイルを取得するクラス"""
     
-    def __init__(self, repo_owner: str = "kambarakun", repo_name: str = "fetch-tokyo-idsc-github-actions"):
+    def __init__(self, repo_owner: str = "kambarakun", repo_name: str = "fetch-tokyo-idsc"):
         self.repo_owner = repo_owner
         self.repo_name = repo_name
         self.base_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"
@@ -246,6 +247,7 @@ class GitHubFetcher:
     def get_recent_sentinel_csv_files(self, days: int = 30, max_files: int = 100) -> List[Dict]:
         """
         最近変更された定点把握疾患CSVファイルを取得（レート制限回避のため）
+        raw URLから直接取得する方式も試行
         
         Args:
             days: 何日前までの変更を取得するか
@@ -254,6 +256,13 @@ class GitHubFetcher:
         Returns:
             定点把握疾患CSVファイル情報のリスト
         """
+        # まず、raw URLから直接取得を試行（レート制限回避）
+        csv_files = self._get_sentinel_files_via_raw_url(max_files)
+        if csv_files:
+            logger.info(f"raw URLから {len(csv_files)} 件の定点把握疾患CSVファイルを取得しました")
+            return csv_files
+        
+        # フォールバック: GitHub APIを使用
         try:
             # 最新のコミットを取得
             commits_url = f"{self.base_url}/commits"
@@ -310,8 +319,106 @@ class GitHubFetcher:
             
         except Exception as e:
             logger.error(f"最近の定点把握疾患CSVファイル取得に失敗しました: {str(e)}")
-            # フォールバック: 最初のページのみ取得
-            return self.list_sentinel_csv_files("data/raw")[:max_files]
+            # フォールバック: raw URLから直接取得を再試行
+            return self._get_sentinel_files_via_raw_url(max_files)
+    
+    def _get_sentinel_files_via_raw_url(self, max_files: int = 100) -> List[Dict]:
+        """
+        raw URLから直接定点把握疾患CSVファイルを取得（レート制限回避）
+        最新の週から順に試行
+        """
+        from datetime import datetime, timedelta
+        
+        csv_files = []
+        current_date = datetime.now()
+        current_year = current_date.year
+        
+        # 現在の週番号を計算（ISO週番号を使用）
+        # より正確な週番号計算
+        jan1 = datetime(current_year, 1, 1)
+        days_since_jan1 = (current_date - jan1).days
+        # ISO週番号を計算（月曜日を週の始まりとする）
+        current_week = (days_since_jan1 // 7) + 1
+        
+        # 最新の週から遡って取得（最大52週分 + 最新の数週間を多めにチェック）
+        weeks_to_check = []
+        # 現在の年: 最新の週から遡る（最大60週分チェック）
+        for week in range(max(1, current_week - 60), current_week + 5):
+            weeks_to_check.append((current_year, week))
+        
+        # 前年もチェック（最新の数週間）
+        if current_year > 2000:
+            for week in range(max(1, 52 - 15), 53):
+                weeks_to_check.append((current_year - 1, week))
+        
+        logger.info(f"raw URLから定点把握疾患ファイルを検索中: {len(weeks_to_check)} 週分")
+        
+        # 複数のリポジトリ名を試す
+        repo_names = [self.repo_name, "fetch-tokyo-idsc-github-actions"]
+        
+        for repo_name in repo_names:
+            raw_base_url = f"https://raw.githubusercontent.com/{self.repo_owner}/{repo_name}/main"
+            
+            for year, week in weeks_to_check:
+                if len(csv_files) >= max_files:
+                    break
+                
+                # 複数のファイル名パターンを試す
+                # パターン1: sentinel_weekly_gender_2025_25.csv
+                # パターン2: sentinel_weekly_gender_2025_25_20250703_031821_raw.csv
+                # パターン3: sentinel_weekly_gender_2025_25_YYYYMMDD_HHMMSS_raw.csv (最近の日付パターン)
+                filenames = [
+                    f"sentinel_weekly_gender_{year}_{week:02d}.csv",
+                    f"sentinel_weekly_gender_{year}_{week}.csv",
+                ]
+                
+                # 最近の日付パターンも追加（過去30日間）
+                for days_ago in range(0, 30, 7):  # 7日ごとにチェック
+                    check_date = current_date - timedelta(days=days_ago)
+                    filenames.append(f"sentinel_weekly_gender_{year}_{week}_{check_date.strftime('%Y%m%d')}_000000_raw.csv")
+                
+                for filename in filenames:
+                    raw_url = f"{raw_base_url}/data/raw/{filename}"
+                    try:
+                        # HEADリクエストでファイルの存在確認（GitHub Actions環境ではHEADが失敗する場合があるため、GETも試行）
+                        try:
+                            response = requests.head(raw_url, timeout=10, allow_redirects=True)
+                        except requests.exceptions.RequestException:
+                            # HEADが失敗した場合はGETを試行（最初の1バイトのみ取得）
+                            response = requests.get(raw_url, timeout=10, allow_redirects=True, stream=True)
+                            # ストリームを閉じる
+                            response.close()
+                            # ステータスコードを確認するため、再度リクエスト（簡易版）
+                            response = requests.get(raw_url, timeout=10, allow_redirects=True, headers={'Range': 'bytes=0-0'})
+                        
+                        if response.status_code == 200 or response.status_code == 206:
+                            # ファイルが存在する場合、情報を追加
+                            csv_files.append({
+                                "name": filename,
+                                "path": f"data/raw/{filename}",
+                                "sha": None,
+                                "size": 0,
+                                "download_url": raw_url
+                            })
+                            logger.info(f"ファイルが見つかりました: {filename} (リポジトリ: {repo_name})")
+                            break  # 成功したら次の週へ
+                        # 404の場合は次のパターンを試す
+                    except requests.exceptions.RequestException as e:
+                        logger.debug(f"ファイルチェックエラー {filename}: {str(e)}")
+                        continue
+                    except Exception as e:
+                        logger.debug(f"予期しないエラー {filename}: {str(e)}")
+                        continue
+            
+            # 1つのリポジトリでファイルが見つかったら終了
+            if csv_files:
+                break
+        
+        if csv_files:
+            logger.info(f"raw URLから {len(csv_files)} 件の定点把握疾患ファイルを発見しました（リポジトリ: {repo_name if 'repo_name' in locals() else 'unknown'}）")
+        else:
+            logger.warning(f"raw URLから定点把握疾患ファイルが見つかりませんでした（チェックした週数: {len(weeks_to_check)}）")
+        return csv_files
     
     def download_new_csv_files(self, local_csv_dir: str, existing_files: Optional[List[str]] = None, use_recent_only: bool = True) -> List[str]:
         """

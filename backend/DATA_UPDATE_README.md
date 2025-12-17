@@ -4,7 +4,7 @@
 
 ## 📋 概要
 
-`https://github.com/kambarakun/fetch-tokyo-idsc-github-actions` から定期的に新しいCSVファイルを取得し、既存のデータベースに統合してダッシュボードを更新します。
+`https://github.com/kambarakun/fetch-tokyo-idsc` から定期的に新しいCSVファイルを取得し、既存のデータベースに統合してダッシュボードを更新します。
 
 ## 🔧 コンポーネント
 
@@ -97,7 +97,7 @@ curl -X POST http://localhost:8000/update-data-sync
 ```python
 fetcher = GitHubFetcher(
     repo_owner="kambarakun",
-    repo_name="fetch-tokyo-idsc-github-actions"
+    repo_name="fetch-tokyo-idsc"
 )
 ```
 

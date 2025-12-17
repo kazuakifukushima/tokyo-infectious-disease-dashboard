@@ -60,7 +60,7 @@ def download_file_by_name(repo_owner: str, repo_name: str, filename: str, save_p
 
 def download_recent_files(
     repo_owner: str = "kambarakun",
-    repo_name: str = "fetch-tokyo-idsc-github-actions",
+    repo_name: str = "fetch-tokyo-idsc",
     csv_dir: str = "../csv_list",
     existing_files: Optional[List[str]] = None,
     years: Optional[List[int]] = None,

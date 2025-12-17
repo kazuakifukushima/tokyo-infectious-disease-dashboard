@@ -244,8 +244,9 @@ def create_disease_summary(processed_data):
     
     for record in processed_data:
         disease = record['disease_name']
-        year = record['year']
-        count = record['total_count']
+        # 型変換を確実に行う
+        year = int(record['year']) if isinstance(record['year'], str) else record['year']
+        count = int(record['total_count']) if isinstance(record['total_count'], str) else record['total_count']
         
         disease_stats[disease]['total_reports'] += 1
         disease_stats[disease]['total_cases'] += count
@@ -343,8 +344,8 @@ def main():
             'total_diseases': len(available_major_diseases),
             'available_diseases': available_major_diseases,
             'date_range': {
-                'start_year': min(record['year'] for record in major_disease_data) if major_disease_data else None,
-                'end_year': max(record['year'] for record in major_disease_data) if major_disease_data else None
+                'start_year': min(int(d['year']) if isinstance(d.get('year'), str) else d.get('year', 0) for d in major_disease_data) if major_disease_data else None,
+                'end_year': max(int(d['year']) if isinstance(d.get('year'), str) else d.get('year', 0) for d in major_disease_data) if major_disease_data else None
             },
             'disease_statistics': major_disease_summary
         }, f, ensure_ascii=False, indent=2)
