@@ -6,7 +6,7 @@
   "installCommand": "npm install",
   "functions": {
     "app/**": {
-      "runtime": "nodejs18.x"
+      "runtime": "nodejs24.x"
     }
   }
 }
