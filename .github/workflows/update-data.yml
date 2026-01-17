@@ -37,14 +37,18 @@ jobs:
       continue-on-error: false
     
     - name: 変更をコミットしてプッシュ
-      if: github.event_name == 'schedule'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         # csv_list/は不要になったため、backend/processed_data/とdata/のみをコミット
         git add backend/processed_data/ data/ public/data/ || true
         if ! git diff --staged --quiet; then
-          git commit -m "自動データ更新: $(date +'%Y-%m-%d %H:%M:%S')" || exit 0
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            COMMIT_MSG="自動データ更新: $(date +'%Y-%m-%d %H:%M:%S')"
+          else
+            COMMIT_MSG="手動データ更新: $(date +'%Y-%m-%d %H:%M:%S')"
+          fi
+          git commit -m "$COMMIT_MSG" || exit 0
           git push || exit 0
         else
           echo "変更がないため、コミット・プッシュをスキップします"
